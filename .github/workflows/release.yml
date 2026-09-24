@@ -94,8 +94,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          architecture: arm64
           cache: 'npm'
           cache-dependency-path: desktop/package-lock.json
+
+      - name: Check Node architecture
+        run: test "$(node -p process.arch)" = arm64
 
       - name: Verify example ZIP
         run: node -e "const fs=require('fs');const z=fs.readdirSync('example_drama').filter(f=>f.endsWith('.zip'));if(!z.length||z.some(f=>fs.statSync('example_drama/'+f).size<1024))throw Error('Example ZIP not fetched from Git LFS')"
@@ -104,9 +108,12 @@ jobs:
         working-directory: frontweb
         run: npm ci
 
-      - name: Install desktop dependencies and rebuild native modules
+      - name: Install desktop dependencies and rebuild ARM64 native modules
         working-directory: desktop
-        run: npm ci
+        run: |
+          npm ci
+          npx electron-builder install-app-deps --arch=arm64
+          lipo -verify_arch arm64 node_modules/better-sqlite3/build/Release/better_sqlite3.node
 
       - name: Build frontend and copy assets
         working-directory: desktop
@@ -122,6 +129,23 @@ jobs:
         run: |
           npx electron-builder --mac --arm64 --config electron-builder-mac.json --publish never
           npx electron-builder --mac --arm64 --config electron-builder-mac-lite.json --publish never
+
+      - name: Verify DMG native modules are ARM64
+        working-directory: desktop
+        run: |
+          for dmg in release/*-mac-arm64.dmg; do
+            mount="$(mktemp -d)"
+            hdiutil attach -quiet -readonly -nobrowse -mountpoint "$mount" "$dmg"
+            found=0
+            while IFS= read -r -d '' addon; do
+              echo "Checking $addon"
+              lipo -verify_arch arm64 "$addon"
+              found=1
+            done < <(find "$mount" -type f -name '*.node' -print0)
+            test "$found" = 1
+            hdiutil detach -quiet "$mount"
+            rmdir "$mount"
+          done
 
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
