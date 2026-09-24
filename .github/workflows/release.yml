@@ -71,6 +71,7 @@ jobs:
         with:
           name: windows-release
           path: desktop/release/*.exe
+          if-no-files-found: error
           retention-days: 7
 
   build-macos-arm64:
@@ -123,27 +124,31 @@ jobs:
           retention-days: 7
 
   publish:
-    name: Create GitHub Release
+    name: Publish GitHub Release
     needs: [build-windows, build-macos-arm64]
-    if: github.event_name == 'push'
+    if: ${{ always() && github.event_name == 'push' && needs.build-macos-arm64.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download build artifacts
+      - name: Download macOS DMGs
         uses: actions/download-artifact@v4
         with:
-          pattern: '*-release'
+          name: macos-arm64-release
           path: release
-          merge-multiple: true
 
-      - name: Create draft release
+      - name: Download Windows installers (if built)
+        if: needs.build-windows.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release
+
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/*.exe
-            release/*.dmg
+          files: release/*
           fail_on_unmatched_files: true
           generate_release_notes: true
-          draft: true   # 先创建草稿，人工审核后手动发布
+          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
