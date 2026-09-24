@@ -62,8 +62,6 @@ jobs:
       # 标准版（含示例数据）
       - name: Build Standard Installer
         working-directory: desktop
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --publish never
 
       - name: Upload Standard Build Artifacts
