@@ -113,7 +113,7 @@ jobs:
         run: |
           npm ci
           npx electron-builder install-app-deps --arch=arm64
-          lipo -verify_arch arm64 node_modules/better-sqlite3/build/Release/better_sqlite3.node
+          lipo node_modules/better-sqlite3/build/Release/better_sqlite3.node -verify_arch arm64
 
       - name: Build frontend and copy assets
         working-directory: desktop
@@ -139,7 +139,7 @@ jobs:
             found=0
             while IFS= read -r -d '' addon; do
               echo "Checking $addon"
-              lipo -verify_arch arm64 "$addon"
+              lipo "$addon" -verify_arch arm64
               found=1
             done < <(find "$mount" -type f -name '*.node' -print0)
             test "$found" = 1
