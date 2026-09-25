@@ -24,14 +24,14 @@ echo ""
 npm run prepare-backend
 npm run build:front
 npm run copy-front
-npx electron-builder --mac --config electron-builder-mac.json
+npx electron-builder --mac --x64 --arm64 --config electron-builder-mac.json
 
 echo ""
 echo "========== [2/2] 构建纯净版（不含示例资源）=========="
 echo ""
 
 # 前端/后端已准备好，直接再打一次 lite 包
-npx electron-builder --mac --config electron-builder-mac-lite.json
+npx electron-builder --mac --x64 --arm64 --config electron-builder-mac-lite.json
 
 echo ""
 echo "========== 全部构建完成 =========="
