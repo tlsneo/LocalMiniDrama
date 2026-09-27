@@ -29,7 +29,7 @@ function modelFromDb(val) {
 
 /** 每种服务类型只保留一个默认：若有多个 is_default=1，只保留优先级最高（同优先级取 id 最小）的那条 */
 function ensureSingleDefaultPerType(db) {
-  const types = ['text', 'image', 'storyboard_image', 'video', 'tts', 'jimeng2_character_auth', 'model_ark_asset'];
+  const types = ['text', 'image', 'storyboard_image', 'image_edit', 'video', 'tts', 'jimeng2_character_auth', 'model_ark_asset'];
   for (const st of types) {
     const rows = db.prepare(
       'SELECT id, priority FROM ai_service_configs WHERE deleted_at IS NULL AND service_type = ? AND is_default = 1 ORDER BY priority DESC, id ASC'
@@ -72,7 +72,7 @@ function createConfig(db, log, req) {
   const model = modelToDb(req.model);
   let endpoint = req.endpoint || '';
   let queryEndpoint = req.query_endpoint || '';
-  if (!endpoint && req.provider) {
+  if (!endpoint && req.provider && req.service_type !== 'image_edit') {
     const p = req.provider.toLowerCase();
     const st = (req.service_type || 'text').toLowerCase();
     if (p === 'openai') {
@@ -141,6 +141,9 @@ function createConfig(db, log, req) {
 function updateConfig(db, log, id, req) {
   const existing = getConfig(db, id);
   if (!existing) return null;
+  if (req.service_type != null && req.service_type !== existing.service_type) {
+    throw Object.assign(new Error('已有配置不能修改服务类型，请新增配置'), { status: 400 });
+  }
   const updates = [];
   const params = [];
   if (req.name != null) {
@@ -249,6 +252,10 @@ function rowToConfig(r) {
  * @returns Promise<void> 成功 resolve，失败 reject(error)
  */
 async function testConnection(opts) {
+  const serviceType = (opts.service_type || '').toLowerCase();
+  if (serviceType === 'image_edit') {
+    throw Object.assign(new Error('图片编辑协议尚未对接，暂不可测试或调用'), { status: 503 });
+  }
   const base = (opts.base_url || '').replace(/\/$/, '');
   if (!base) throw new Error('base_url 必填');
   if (!opts.api_key) throw new Error('api_key 必填');
@@ -256,7 +263,6 @@ async function testConnection(opts) {
   const model = models[0] || '';
   if (!model && (opts.provider === 'gemini' || opts.provider === 'google')) throw new Error('model 必填');
   const provider = (opts.provider || 'openai').toLowerCase();
-  const serviceType = (opts.service_type || '').toLowerCase();
   let endpoint = opts.endpoint || '';
 
   // --- NanoBanana ---

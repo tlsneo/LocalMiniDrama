@@ -5,6 +5,8 @@ import { characterLibraryAPI } from '@/api/characterLibrary'
 import { dramaAPI } from '@/api/drama'
 import { generationAPI } from '@/api/generation'
 import { uploadAPI } from '@/api/upload'
+import { ensureReferenceUploaded } from '@/utils/filmCreateReference.js'
+import { useImageEditor } from '@/composables/useImageEditor'
 import { useGenerationTaskStore, GEN_RESOURCE } from '@/stores/generationTaskStore'
 import { buildExtractTaskMeta, isEpisodeExtractRunning } from '@/composables/useGenerationTaskSync'
 
@@ -39,15 +41,7 @@ export function useCharacters(deps) {
     }
   }
 
-  function dataUrlToFile(dataUrl, filename) {
-    const arr = dataUrl.split(',')
-    const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) u8arr[n] = bstr.charCodeAt(n)
-    return new File([u8arr], filename || 'reference.png', { type: mime })
-  }
+  const { busy: imageEditBusy } = useImageEditor()
 
   // ── 角色弹窗状态 ─────────────────────────────────────
   const showEditCharacter = ref(false)
@@ -198,17 +192,12 @@ export function useCharacters(deps) {
   async function saveCharRefImageIfAny(characterId) {
     const refImg = addCharRefImage.value
     if (!refImg || !characterId) return
-    try {
-      const file = dataUrlToFile(refImg.dataUrl, refImg.filename || 'reference.png')
-      const uploadRes = await uploadAPI.uploadImage(file, { dramaId: dramaId.value })
-      const refPath = uploadRes.local_path || uploadRes.url || ''
-      await characterAPI.putRefImage(characterId, refPath)
-    } catch (e) {
-      console.warn('[saveCharRefImage] 保存参考图失败:', e.message)
-    }
+    const refPath = await ensureReferenceUploaded(refImg, file => uploadAPI.uploadImage(file, { dramaId: dramaId.value }))
+    await characterAPI.putRefImage(characterId, refPath)
   }
 
   async function submitEditCharacter() {
+    if (imageEditBusy.value) return
     const form = editCharacterForm.value
     if (!form?.name?.trim() || !store.dramaId) return
     editCharacterSaving.value = true
@@ -226,6 +215,7 @@ export function useCharacters(deps) {
         await saveCharRefImageIfAny(form.id)
         ElMessage.success('角色已保存')
       } else {
+        if (form.creationSubmitted) throw new Error('新增角色已提交，但身份尚未确认；请刷新角色列表后重新打开，不能重复添加')
         const existing = (store.drama?.characters || []).map((c) => ({
           id: c.id,
           name: c.name || '',
@@ -246,11 +236,13 @@ export function useCharacters(deps) {
           }],
           episode_id: currentEpisodeId.value ?? undefined
         })
+        form.creationSubmitted = true
         await loadDrama()
-        if (addCharRefImage.value) {
-          const newChar = (store.drama?.characters || []).find(c => c.name === form.name.trim())
-          if (newChar?.id) await saveCharRefImageIfAny(newChar.id)
-        }
+        const existingIds = new Set(existing.map(c => Number(c.id)))
+        const created = (store.drama?.characters || []).filter(c => !existingIds.has(Number(c.id)))
+        if (created.length !== 1) throw new Error('无法确认新增角色，请重新打开角色列表后保存参考图')
+        form.id = created[0].id
+        await saveCharRefImageIfAny(form.id)
         ElMessage.success('角色已添加')
       }
       await loadDrama()
@@ -298,6 +290,7 @@ export function useCharacters(deps) {
   }
 
   async function clearCharRefImage() {
+    if (imageEditBusy.value) return
     const form = editCharacterForm.value
     if (!form?.id) return
     try {

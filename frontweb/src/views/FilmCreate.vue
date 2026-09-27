@@ -561,7 +561,7 @@
                       :class="{ 'asset-cover--clickable': hasAssetImage(char), 'asset-cover--dragover': dragOverResourceKey === 'char-' + char.id }"
                       role="button"
                       tabindex="0"
-                      @click="hasAssetImage(char) && openImagePreview(assetImageUrl(char))"
+                      @click="hasAssetImage(char) && openImagePreview(assetImageUrl(char), resourceImageContext('character', char))"
                       @dragover="onResourceDragOver($event, 'character', char.id)"
                       @dragleave="onResourceDragLeave($event, 'char-' + char.id)"
                       @drop="onResourceDrop($event, 'character', char.id)"
@@ -573,9 +573,9 @@
                     </div>
                     <!-- 额外参考图条 -->
                     <div v-if="parseExtraImages(char).length" class="extra-images-strip">
-                      <div v-for="ep in parseExtraImages(char)" :key="ep" class="extra-thumb" :title="'点击设为主图（悬停左上角可放大预览）'">
+                      <div v-for="(ep, extraIndex) in parseExtraImages(char)" :key="extraIndex" class="extra-thumb" :title="'点击设为主图（悬停左上角可放大预览）'">
                         <img :src="localPathToUrl(ep)" alt="" @click="onSetPrimaryImage('character', char, ep)" />
-                        <button class="thumb-preview-btn" title="放大预览" @click.stop="openImagePreview(localPathToUrl(ep))">
+                        <button class="thumb-preview-btn" title="放大预览 / AI 编辑" @click.stop="openImagePreview(localPathToUrl(ep), resourceImageContext('character', char, 'extra', extraIndex))">
                           <el-icon :size="10"><ZoomIn /></el-icon>
                         </button>
                         <button class="extra-thumb-remove" title="移除" @click.stop="onRemoveExtraImage('character', char, ep)">×</button>
@@ -659,7 +659,7 @@
                       :class="{ 'asset-cover--clickable': hasAssetImage(prop), 'asset-cover--dragover': dragOverResourceKey === 'prop-' + prop.id }"
                       role="button"
                       tabindex="0"
-                      @click="hasAssetImage(prop) && openImagePreview(assetImageUrl(prop))"
+                      @click="hasAssetImage(prop) && openImagePreview(assetImageUrl(prop), resourceImageContext('prop', prop))"
                       @dragover="onResourceDragOver($event, 'prop', prop.id)"
                       @dragleave="onResourceDragLeave($event, 'prop-' + prop.id)"
                       @drop="onResourceDrop($event, 'prop', prop.id)"
@@ -670,9 +670,9 @@
                       <div v-if="dragOverResourceKey === 'prop-' + prop.id" class="asset-cover-drop-hint">松开上传</div>
                     </div>
                     <div v-if="parseExtraImages(prop).length" class="extra-images-strip">
-                      <div v-for="ep in parseExtraImages(prop)" :key="ep" class="extra-thumb" title="点击设为主图（悬停左上角可放大预览）">
+                      <div v-for="(ep, extraIndex) in parseExtraImages(prop)" :key="extraIndex" class="extra-thumb" title="点击设为主图（悬停左上角可放大预览）">
                         <img :src="localPathToUrl(ep)" alt="" @click="onSetPrimaryImage('prop', prop, ep)" />
-                        <button class="thumb-preview-btn" title="放大预览" @click.stop="openImagePreview(localPathToUrl(ep))">
+                        <button class="thumb-preview-btn" title="放大预览 / AI 编辑" @click.stop="openImagePreview(localPathToUrl(ep), resourceImageContext('prop', prop, 'extra', extraIndex))">
                           <el-icon :size="10"><ZoomIn /></el-icon>
                         </button>
                         <button class="extra-thumb-remove" title="移除" @click.stop="onRemoveExtraImage('prop', prop, ep)">×</button>
@@ -760,7 +760,7 @@
                       :class="{ 'asset-cover--clickable': hasAssetImage(scene), 'asset-cover--dragover': dragOverResourceKey === 'scene-' + scene.id }"
                       role="button"
                       tabindex="0"
-                      @click="hasAssetImage(scene) && openImagePreview(assetImageUrl(scene))"
+                      @click="hasAssetImage(scene) && openImagePreview(assetImageUrl(scene), resourceImageContext('scene', scene))"
                       @dragover="onResourceDragOver($event, 'scene', scene.id)"
                       @dragleave="onResourceDragLeave($event, 'scene-' + scene.id)"
                       @drop="onResourceDrop($event, 'scene', scene.id)"
@@ -771,9 +771,9 @@
                       <div v-if="dragOverResourceKey === 'scene-' + scene.id" class="asset-cover-drop-hint">松开上传</div>
                     </div>
                     <div v-if="parseExtraImages(scene).length" class="extra-images-strip">
-                      <div v-for="ep in parseExtraImages(scene)" :key="ep" class="extra-thumb" title="点击设为主图（悬停左上角可放大预览）">
+                      <div v-for="(ep, extraIndex) in parseExtraImages(scene)" :key="extraIndex" class="extra-thumb" title="点击设为主图（悬停左上角可放大预览）">
                         <img :src="localPathToUrl(ep)" alt="" @click="onSetPrimaryImage('scene', scene, ep)" />
-                        <button class="thumb-preview-btn" title="放大预览" @click.stop="openImagePreview(localPathToUrl(ep))">
+                        <button class="thumb-preview-btn" title="放大预览 / AI 编辑" @click.stop="openImagePreview(localPathToUrl(ep), resourceImageContext('scene', scene, 'extra', extraIndex))">
                           <el-icon :size="10"><ZoomIn /></el-icon>
                         </button>
                         <button class="extra-thumb-remove" title="移除" @click.stop="onRemoveExtraImage('scene', scene, ep)">×</button>
@@ -1081,7 +1081,7 @@
                       :class="{ 'sb-thumb-clickable': hasAssetImage(s) }"
                       :title="s.location"
                       role="button"
-                      @click="hasAssetImage(s) && openImagePreview(assetImageUrl(s))"
+                      @click="hasAssetImage(s) && openImagePreview(assetImageUrl(s), resourceImageContext('scene', s))"
                     >
                       <img v-if="hasAssetImage(s)" :src="assetImageUrl(s)" alt="" />
                       <span v-else class="sb-thumb-placeholder">{{ (s.location || '')[0] }}</span>
@@ -1098,7 +1098,7 @@
                       :class="{ 'sb-thumb-clickable': hasAssetImage(c) }"
                       :title="c.name"
                       role="button"
-                      @click="hasAssetImage(c) && openImagePreview(assetImageUrl(c))"
+                      @click="hasAssetImage(c) && openImagePreview(assetImageUrl(c), resourceImageContext('character', c))"
                     >
                       <img v-if="hasAssetImage(c)" :src="assetImageUrl(c)" alt="" />
                       <span v-else class="sb-thumb-placeholder">{{ (c.name || '')[0] }}</span>
@@ -1139,7 +1139,7 @@
                       :class="{ 'sb-thumb-clickable': hasAssetImage(p) }"
                       :title="p.name"
                       role="button"
-                      @click="hasAssetImage(p) && openImagePreview(assetImageUrl(p))"
+                      @click="hasAssetImage(p) && openImagePreview(assetImageUrl(p), resourceImageContext('prop', p))"
                     >
                       <img v-if="hasAssetImage(p)" :src="assetImageUrl(p)" alt="" />
                       <span v-else class="sb-thumb-placeholder">{{ (p.name || '')[0] }}</span>
@@ -1278,19 +1278,19 @@
                             :src="assetImageUrl(getSbFirstImage(sb.id))"
                             class="sb-generated-img"
                             alt=""
-                            @click="openImagePreview(assetImageUrl(getSbFirstImage(sb.id)))"
+                            @click="openImagePreview(assetImageUrl(getSbFirstImage(sb.id)), storyboardImageContext(sb, getSbFirstImage(sb.id), 'first'))"
                           />
                         </template>
-                        <template v-else-if="sb.image_url || sb.composed_image">
+                        <template v-else-if="sb.first_frame_image_id == null && (sb.image_url || sb.composed_image)">
                           <img
                             :src="imageUrl(sb.composed_image || sb.image_url)"
                             class="sb-generated-img"
                             alt=""
-                            @click="openImagePreview(imageUrl(sb.composed_image || sb.image_url))"
+                            @click="openImagePreview(imageUrl(sb.composed_image || sb.image_url), storyboardImageContext(sb, { image_url: sb.composed_image || sb.image_url }, sb.composed_image ? 'composed' : 'first'))"
                           />
                         </template>
                         <template v-else>
-                          <span class="sb-fl-empty">动作前静止</span>
+                          <span class="sb-fl-empty">{{ sbImageLookupErrors[sb.id]?.first || (sb.first_frame_image_id != null ? '绑定的首帧不可用' : '动作前静止') }}</span>
                         </template>
                       </div>
                       <div v-if="getSbFirstImage(sb.id)?.prompt" class="sb-fl-slot-prompt" :title="getSbFirstImage(sb.id).prompt">
@@ -1315,11 +1315,11 @@
                             class="sb-generated-img"
                             alt=""
                             :title="getSbLastImage(sb.id).prompt || ''"
-                            @click="openImagePreview(assetImageUrl(getSbLastImage(sb.id)))"
+                            @click="openImagePreview(assetImageUrl(getSbLastImage(sb.id)), storyboardImageContext(sb, getSbLastImage(sb.id), 'last'))"
                           />
                         </template>
                         <template v-else>
-                          <span class="sb-fl-empty">动作后结果</span>
+                          <span class="sb-fl-empty">{{ sbImageLookupErrors[sb.id]?.last || (sb.last_frame_image_id != null ? '绑定的尾帧不可用' : '动作后结果') }}</span>
                         </template>
                       </div>
                       <div v-if="getSbLastImage(sb.id)?.prompt" class="sb-fl-slot-prompt" :title="getSbLastImage(sb.id).prompt">
@@ -1354,7 +1354,7 @@
                       <img :src="item.src" alt="" />
                       <span v-if="item.frameBadge" class="sb-img-thumb-label">{{ item.frameBadge }}</span>
                       <span v-else-if="item.label" class="sb-img-thumb-label">{{ item.label }}</span>
-                      <button class="thumb-preview-btn" title="放大预览" @click.stop="openImagePreview(item.src)">
+                      <button class="thumb-preview-btn" title="放大预览 / AI 编辑" @click.stop="openImagePreview(item.src, storyboardImageContext(sb, item.img, 'history'))">
                         <el-icon :size="10"><ZoomIn /></el-icon>
                       </button>
                       <button v-if="item.img?.id" class="extra-thumb-remove" title="删除历史图" @click.stop="onRemoveSbHistoryImage(sb.id, item.img.id)">×</button>
@@ -1370,17 +1370,20 @@
                       class="sb-generated-img"
                       alt=""
                       :title="getSbImage(sb.id).prompt || ''"
-                      @click="openImagePreview(assetImageUrl(getSbImage(sb.id)))"
+                      @click="openImagePreview(assetImageUrl(getSbImage(sb.id)), storyboardImageContext(sb, getSbImage(sb.id), 'main'))"
                     />
                     <div v-if="getSbImage(sb.id).prompt" class="sb-main-img-prompt">{{ getSbImage(sb.id).prompt }}</div>
                   </template>
-                  <template v-else-if="sb.composed_image || sb.image_url">
+                  <template v-else-if="sb.first_frame_image_id == null && (sb.composed_image || sb.image_url)">
                     <img
                       :src="imageUrl(sb.composed_image || sb.image_url)"
                       class="sb-generated-img"
                       alt=""
-                      @click="openImagePreview(imageUrl(sb.composed_image || sb.image_url))"
+                      @click="openImagePreview(imageUrl(sb.composed_image || sb.image_url), storyboardImageContext(sb, { image_url: sb.composed_image || sb.image_url }, sb.composed_image ? 'composed' : 'main'))"
                     />
+                  </template>
+                  <template v-else-if="sbImageLookupErrors[sb.id]?.main || sb.first_frame_image_id != null">
+                    <div class="sb-image-error">{{ sbImageLookupErrors[sb.id]?.main || '绑定的主图不可用' }}</div>
                   </template>
                   <template v-else-if="sb.error_msg || sb.errorMsg">
                     <div class="sb-image-error" :title="sb.error_msg || sb.errorMsg">{{ sb.error_msg || sb.errorMsg }}</div>
@@ -1411,7 +1414,7 @@
                   >
                     <img :src="item.src" alt="" />
                     <span v-if="item.label" class="sb-img-thumb-label">{{ item.label }}</span>
-                    <button class="thumb-preview-btn" title="放大预览" @click.stop="openImagePreview(item.src)">
+                    <button class="thumb-preview-btn" title="放大预览 / AI 编辑" @click.stop="openImagePreview(item.src, storyboardImageContext(sb, item.img, 'history'))">
                       <el-icon :size="10"><ZoomIn /></el-icon>
                     </button>
                     <button v-if="item.img?.id" class="extra-thumb-remove" title="删除历史图" @click.stop="onRemoveSbHistoryImage(sb.id, item.img.id)">×</button>
@@ -1662,7 +1665,7 @@
     </main>
 
     <!-- 添加道具弹窗 -->
-    <el-dialog v-model="showAddProp" title="添加道具" width="600px" @close="() => { addPropForm = { name: '', type: '', description: '', prompt: '' }; addPropAddRefImage = null }">
+    <el-dialog v-model="showAddProp" title="添加道具" width="600px" :before-close="beforeReferenceClose" @close="() => { addPropForm = { name: '', type: '', description: '', prompt: '' }; addPropAddRefImage = null }">
       <el-form label-width="90px">
         <el-form-item label="参考图">
           <div class="ref-image-zone">
@@ -1670,9 +1673,10 @@
               <img v-if="addPropAddRefImage" :src="addPropAddRefImage.dataUrl" class="ref-preview-img" />
               <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
             </div>
+            <el-button v-if="addPropAddRefImage?.dataUrl" size="small" :disabled="imageEditBusy" :loading="referenceOpening" @click="editReferenceImage('addProp')">AI 编辑参考输入</el-button>
             <div v-if="addPropAddRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingPropAddDesc" @click="doExtractFromRef2('addProp')">提取特征描述</el-button>
-              <el-button size="small" @click="addPropAddRefImage = null">移除</el-button>
+              <el-button size="small" :disabled="imageEditBusy || referenceOpening" @click="addPropAddRefImage = null">移除</el-button>
             </div>
           </div>
         </el-form-item>
@@ -1690,8 +1694,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddProp = false">取消</el-button>
-        <el-button type="primary" :loading="addPropSaving" :disabled="!addPropForm.name.trim()" @click="submitAddProp">确定</el-button>
+        <el-button :disabled="imageEditBusy || referenceOpening" @click="showAddProp = false">取消</el-button>
+        <el-button type="primary" :loading="addPropSaving" :disabled="imageEditBusy || referenceOpening || !addPropForm.name.trim()" @click="submitAddProp">确定</el-button>
       </template>
     </el-dialog>
 
@@ -1702,7 +1706,7 @@
     <input ref="addPropAddRefFileInput" type="file" accept="image/*" style="display:none" @change="onRefImageFileChange2('addProp', $event)" />
 
     <!-- 添加/编辑角色弹窗 -->
-    <el-dialog v-model="showEditCharacter" :title="editCharacterForm?.id ? '编辑角色' : '添加角色'" width="75%" @close="onCloseCharDialog">
+    <el-dialog v-model="showEditCharacter" :title="editCharacterForm?.id ? '编辑角色' : '添加角色'" width="75%" :before-close="beforeReferenceClose" @close="onCloseCharDialog">
       <el-form v-if="editCharacterForm" label-width="90px">
         <!-- 参考图上传区（新增/编辑均显示） -->
         <el-form-item label="参考图">
@@ -1720,9 +1724,10 @@
                 class="ref-preview-img" style="opacity:0.5" />
               <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
             </div>
+            <el-button v-if="addCharRefImage?.dataUrl || editCharacterForm.ref_image || hasAssetImage(editCharacterForm)" size="small" :disabled="imageEditBusy" :loading="referenceOpening" @click="editReferenceImage('character')">AI 编辑{{ addCharRefImage ? '参考输入' : editCharacterForm.ref_image ? '参考图' : '主图作为参考图' }}</el-button>
             <div v-if="addCharRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingCharAppearance" @click="doExtractFromRef('character')">提取特征描述</el-button>
-              <el-button size="small" @click="addCharRefImage = null">移除</el-button>
+              <el-button size="small" :disabled="imageEditBusy || referenceOpening" @click="addCharRefImage = null">移除</el-button>
             </div>
             <div v-else-if="editCharacterForm.ref_image" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingCharAppearance" @click="doExtractCharFromImage">从参考图提取描述</el-button>
@@ -1815,8 +1820,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showEditCharacter = false">取消</el-button>
-        <el-button type="primary" :loading="editCharacterSaving" :disabled="!editCharacterForm?.name?.trim()" @click="submitEditCharacter">{{ editCharacterForm?.id ? '保存' : '添加' }}</el-button>
+        <el-button :disabled="imageEditBusy || referenceOpening" @click="showEditCharacter = false">取消</el-button>
+        <el-button type="primary" :loading="editCharacterSaving" :disabled="imageEditBusy || referenceOpening || !editCharacterForm?.name?.trim()" @click="submitEditCharacter">{{ editCharacterForm?.id ? '保存' : '添加' }}</el-button>
       </template>
     </el-dialog>
 
@@ -1852,7 +1857,7 @@
     </el-dialog>
 
     <!-- 编辑道具弹窗 -->
-    <el-dialog v-model="showEditProp" :title="editPropForm?.id ? '编辑道具' : '添加道具'" width="75%" @close="onClosePropDialog">
+    <el-dialog v-model="showEditProp" :title="editPropForm?.id ? '编辑道具' : '添加道具'" width="75%" :before-close="beforeReferenceClose" @close="onClosePropDialog">
       <el-form v-if="editPropForm" label-width="90px">
         <!-- 参考图上传区（新增/编辑均显示） -->
         <el-form-item label="参考图">
@@ -1866,9 +1871,10 @@
                 :src="assetImageUrl(editPropForm)" class="ref-preview-img" style="opacity:0.5" />
               <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
             </div>
+            <el-button v-if="addPropRefImage?.dataUrl || editPropForm.ref_image || hasAssetImage(editPropForm)" size="small" :disabled="imageEditBusy" :loading="referenceOpening" @click="editReferenceImage('prop')">AI 编辑{{ addPropRefImage ? '参考输入' : editPropForm.ref_image ? '参考图' : '主图作为参考图' }}</el-button>
             <div v-if="addPropRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingPropDesc" @click="doExtractFromRef('prop')">提取特征描述</el-button>
-              <el-button size="small" @click="addPropRefImage = null">移除</el-button>
+              <el-button size="small" :disabled="imageEditBusy || referenceOpening" @click="addPropRefImage = null">移除</el-button>
             </div>
             <div v-else-if="editPropForm.ref_image" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingPropDesc" @click="doExtractPropFromImage">从参考图提取描述</el-button>
@@ -1905,13 +1911,13 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showEditProp = false">取消</el-button>
-        <el-button type="primary" :loading="editPropSaving" :disabled="!editPropForm?.name?.trim()" @click="submitEditProp">保存</el-button>
+        <el-button :disabled="imageEditBusy || referenceOpening" @click="showEditProp = false">取消</el-button>
+        <el-button type="primary" :loading="editPropSaving" :disabled="imageEditBusy || referenceOpening || !editPropForm?.name?.trim()" @click="submitEditProp">保存</el-button>
       </template>
     </el-dialog>
 
     <!-- 添加/编辑场景弹窗 -->
-    <el-dialog v-model="showEditScene" :title="editSceneForm?.id ? '编辑场景' : '添加场景'" width="75%" @close="onCloseSceneDialog">
+    <el-dialog v-model="showEditScene" :title="editSceneForm?.id ? '编辑场景' : '添加场景'" width="75%" :before-close="beforeReferenceClose" @close="onCloseSceneDialog">
       <el-form v-if="editSceneForm" label-width="90px">
         <!-- 参考图上传区（新增/编辑均显示） -->
         <el-form-item label="参考图">
@@ -1925,9 +1931,10 @@
                 :src="assetImageUrl(editSceneForm)" class="ref-preview-img" style="opacity:0.5" />
               <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
             </div>
+            <el-button v-if="addSceneRefImage?.dataUrl || editSceneForm.ref_image || hasAssetImage(editSceneForm)" size="small" :disabled="imageEditBusy" :loading="referenceOpening" @click="editReferenceImage('scene')">AI 编辑{{ addSceneRefImage ? '参考输入' : editSceneForm.ref_image ? '参考图' : '主图作为参考图' }}</el-button>
             <div v-if="addSceneRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingSceneDesc" @click="doExtractFromRef('scene')">提取特征描述</el-button>
-              <el-button size="small" @click="addSceneRefImage = null">移除</el-button>
+              <el-button size="small" :disabled="imageEditBusy || referenceOpening" @click="addSceneRefImage = null">移除</el-button>
             </div>
             <div v-else-if="editSceneForm.ref_image" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingSceneDesc" @click="doExtractSceneFromImage">从参考图提取描述</el-button>
@@ -1986,8 +1993,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showEditScene = false">取消</el-button>
-        <el-button type="primary" :loading="editSceneSaving" :disabled="!editSceneForm?.location?.trim()" @click="submitEditScene">{{ editSceneForm?.id ? '保存' : '添加' }}</el-button>
+        <el-button :disabled="imageEditBusy || referenceOpening" @click="showEditScene = false">取消</el-button>
+        <el-button type="primary" :loading="editSceneSaving" :disabled="imageEditBusy || referenceOpening || !editSceneForm?.location?.trim()" @click="submitEditScene">{{ editSceneForm?.id ? '保存' : '添加' }}</el-button>
       </template>
     </el-dialog>
 
@@ -2000,7 +2007,7 @@
           </div>
           <div v-loading="charLibraryLoading" class="library-list">
             <div v-for="item in charLibraryList" :key="'lib-' + item.id" class="library-item">
-              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item), resourceImageContext('character_library', item))">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-item-placeholder">暂无图</span>
               </div>
@@ -2035,7 +2042,7 @@
           </div>
           <div v-loading="dramaAllCharLoading" class="library-list">
             <div v-for="item in dramaAllCharList" :key="'drama-' + item.id" class="library-item">
-              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item), resourceImageContext('character', item))">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-item-placeholder">暂无图</span>
               </div>
@@ -2101,7 +2108,7 @@
           </div>
           <div v-loading="propLibraryLoading" class="library-list">
             <div v-for="item in propLibraryList" :key="'plib-' + item.id" class="library-item">
-              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item), resourceImageContext('prop_library', item))">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-item-placeholder">暂无图</span>
               </div>
@@ -2127,7 +2134,7 @@
           </div>
           <div v-loading="dramaAllPropLoading" class="library-list">
             <div v-for="item in dramaAllPropList" :key="'pdr-' + item.id" class="library-item">
-              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item), resourceImageContext('prop', item))">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-item-placeholder">暂无图</span>
               </div>
@@ -2181,7 +2188,7 @@
           </div>
           <div v-loading="sceneLibraryLoading" class="library-list">
             <div v-for="item in sceneLibraryList" :key="'slib-' + item.id" class="library-item">
-              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item), resourceImageContext('scene_library', item))">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-item-placeholder">暂无图</span>
               </div>
@@ -2207,7 +2214,7 @@
           </div>
           <div v-loading="dramaAllSceneLoading" class="library-list">
             <div v-for="item in dramaAllSceneList" :key="'sdr-' + item.id" class="library-item">
-              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item), resourceImageContext('scene', item))">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-item-placeholder">暂无图</span>
               </div>
@@ -2623,6 +2630,7 @@
         @click="closeImagePreview"
       >
         <img :src="previewImageUrl" alt="" class="image-preview-img" @click.stop="closeImagePreview" />
+        <el-button v-if="previewImageContext" class="image-edit-entry" type="primary" :disabled="imageEditBusy" @click.stop="editPreviewImage">AI 编辑</el-button>
       </div>
     </Teleport>
   </div>
@@ -2671,6 +2679,9 @@ import { runGenerateStoryFromPremise } from '@/composables/useStoryGeneration'
 import { useCharacters } from '@/composables/filmCreate/useCharacters'
 import { useProps as usePropsComposable } from '@/composables/filmCreate/useProps'
 import { useScenes } from '@/composables/filmCreate/useScenes'
+import { useImageEditor } from '@/composables/useImageEditor'
+import { ensureReferenceUploaded, referenceEditContext, referenceExtractionInput } from '@/utils/filmCreateReference.js'
+import { resolveSbImageRecord, resolveSbFirstImageRecord, storyboardImageLookup, validateStoryboardImage } from '@/utils/storyboardMedia.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -3397,11 +3408,52 @@ function getFirstImageFile(dataTransfer) {
 
 // ── 参考图文件读取工具 ──────────────────────────────────
 function readFileAsRefImage(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (ev) => resolve({ dataUrl: ev.target.result, filename: file.name })
+    reader.onerror = () => reject(new Error('读取参考图失败'))
     reader.readAsDataURL(file)
   })
+}
+function referenceSlot(type) {
+  return {
+    character: { draftRef: addCharRefImage, formRef: editCharacterForm, visible: showEditCharacter },
+    scene: { draftRef: addSceneRefImage, formRef: editSceneForm, visible: showEditScene },
+    prop: { draftRef: addPropRefImage, formRef: editPropForm, visible: showEditProp },
+    addProp: { draftRef: addPropAddRefImage, formRef: addPropForm, visible: showAddProp },
+  }[type]
+}
+async function setReferenceFile(type, file) {
+  if (!file || imageEditBusy.value || referenceOpening.value) return
+  const { draftRef, formRef, visible } = referenceSlot(type)
+  const form = formRef.value
+  draftRef.value = { id: crypto.randomUUID(), dataUrl: '', filename: file.name }
+  const draft = draftRef.value
+  try {
+    const result = await readFileAsRefImage(file)
+    if (!imageEditBusy.value && visible.value && formRef.value === form && draftRef.value === draft) Object.assign(draft, result)
+  } catch (e) { ElMessage.error(e.message || '读取参考图失败') }
+}
+const referenceOpening = ref(false)
+async function editReferenceImage(type) {
+  if (imageEditBusy.value || referenceOpening.value) return
+  const slot = referenceSlot(type)
+  const draft = slot.draftRef.value
+  const form = slot.formRef.value
+  referenceOpening.value = true
+  try {
+    if (draft) {
+      await ensureReferenceUploaded(draft, file => uploadAPI.uploadImage(file, { dramaId: dramaId.value }))
+      if (!slot.visible.value || slot.formRef.value !== form || slot.draftRef.value !== draft) throw new Error('参考图输入已变更，请重新打开')
+      await openImageEditor(referenceEditContext({ ...slot, dramaId: Number(dramaId.value) }))
+    } else if (form?.id) {
+      await openImageEditor(resourceImageContext(type, form, 'ref'))
+    }
+  } catch (e) { ElMessage.error(e.message || '无法打开参考图编辑') }
+  finally { referenceOpening.value = false }
+}
+function beforeReferenceClose(done) {
+  if (!imageEditBusy.value && !referenceOpening.value) done()
 }
 
 /**
@@ -3410,12 +3462,8 @@ function readFileAsRefImage(file) {
  */
 async function onRefImageFileChange(type, event) {
   const file = event.target?.files?.[0]
-  if (!file) return
-  const result = await readFileAsRefImage(file)
-  if (type === 'character') addCharRefImage.value = result
-  else if (type === 'prop') addPropRefImage.value = result
-  else if (type === 'scene') addSceneRefImage.value = result
   event.target.value = ''
+  await setReferenceFile(type, file)
 }
 
 /**
@@ -3423,12 +3471,7 @@ async function onRefImageFileChange(type, event) {
  * type: 'character' | 'prop' | 'scene'
  */
 async function onRefImageDrop(type, event) {
-  const file = getFirstImageFile(event.dataTransfer)
-  if (!file) return
-  const result = await readFileAsRefImage(file)
-  if (type === 'character') addCharRefImage.value = result
-  else if (type === 'prop') addPropRefImage.value = result
-  else if (type === 'scene') addSceneRefImage.value = result
+  await setReferenceFile(type, getFirstImageFile(event.dataTransfer))
 }
 
 /**
@@ -3436,11 +3479,7 @@ async function onRefImageDrop(type, event) {
  * type: 'addProp'
  */
 async function onRefImageFileChange2(type, event) {
-  const file = event.target?.files?.[0]
-  if (!file) return
-  const result = await readFileAsRefImage(file)
-  if (type === 'addProp') addPropAddRefImage.value = result
-  event.target.value = ''
+  return onRefImageFileChange(type, event)
 }
 
 /**
@@ -3448,10 +3487,7 @@ async function onRefImageFileChange2(type, event) {
  * type: 'addProp'
  */
 async function onRefImageDrop2(type, event) {
-  const file = getFirstImageFile(event.dataTransfer)
-  if (!file) return
-  const result = await readFileAsRefImage(file)
-  if (type === 'addProp') addPropAddRefImage.value = result
+  return onRefImageDrop(type, event)
 }
 
 /**
@@ -3465,7 +3501,7 @@ async function doExtractFromRef(type) {
     extractingCharAppearance.value = true
     try {
       const name = editCharacterForm.value?.name || ''
-      const res = await uploadAPI.extractDescriptionFromImage('character', refImage.dataUrl, name)
+      const res = await uploadAPI.extractDescriptionFromImage('character', await referenceExtractionInput(refImage), name)
       if (res?.description && editCharacterForm.value) {
         editCharacterForm.value.appearance = res.description
         ElMessage.success('已从参考图提取外貌描述')
@@ -3481,7 +3517,7 @@ async function doExtractFromRef(type) {
     extractingPropDesc.value = true
     try {
       const name = editPropForm.value?.name || ''
-      const res = await uploadAPI.extractDescriptionFromImage('prop', refImage.dataUrl, name)
+      const res = await uploadAPI.extractDescriptionFromImage('prop', await referenceExtractionInput(refImage), name)
       if (res?.description && editPropForm.value) {
         editPropForm.value.description = res.description
         ElMessage.success('已从参考图提取特征描述')
@@ -3497,7 +3533,7 @@ async function doExtractFromRef(type) {
     extractingSceneDesc.value = true
     try {
       const name = editSceneForm.value?.name || ''
-      const res = await uploadAPI.extractDescriptionFromImage('scene', refImage.dataUrl, name)
+      const res = await uploadAPI.extractDescriptionFromImage('scene', await referenceExtractionInput(refImage), name)
       if (res?.description && editSceneForm.value) {
         editSceneForm.value.description = res.description
         ElMessage.success('已从参考图提取场景描述')
@@ -3577,8 +3613,88 @@ function hasAssetImage(item) {
 function getSelectedStyle() {
   return getSelectedStylePrompt()
 }
-function openImagePreview(url) {
+const { open: openImageEditor, busy: imageEditBusy, visible: imageEditorVisible } = useImageEditor()
+const previewImageContext = ref(null)
+const adoptedHistoryPreview = ref(null)
+watch(imageEditorVisible, visible => {
+  if (!visible && adoptedHistoryPreview.value) {
+    const { sb, image } = adoptedHistoryPreview.value
+    adoptedHistoryPreview.value = null
+    openImagePreview(assetImageUrl(image), storyboardImageContext(sb, image, 'history'))
+  }
+})
+function openImagePreview(url, context) {
   previewImageUrl.value = url
+  previewImageContext.value = context
+}
+async function editPreviewImage() {
+  const context = previewImageContext.value
+  closeImagePreview()
+  try { await openImageEditor(context) } catch (e) { ElMessage.error(e.message || '无法打开图片编辑') }
+}
+function resourceImageContext(type, item, slot = 'main', index) {
+  const original = slot === 'extra' ? parseExtraImages(item)[index]
+    : slot === 'ref' ? item.ref_image || '' : item.local_path || item.image_url || ''
+  const sourceRef = original || item.local_path || item.image_url
+  const source = /^(https?:|\/static\/)/.test(sourceRef || '') ? { url: sourceRef } : { local_path: sourceRef }
+  const id = Number(item.id)
+  return {
+    title: `AI 编辑${type.endsWith('_library') ? '库素材' : '共享资源'} · ${item.name || item.location || id} · ${slot === 'extra' ? '副图' : slot === 'ref' ? '参考图' : '主图'}`,
+    source, target: { type, id, slot, ...(slot === 'extra' ? { index } : {}) }, expected_ref: original,
+    async onAdopted() {
+      const [api, lists, form] = {
+        character: [characterAPI, () => [store.drama?.characters, store.characters, dramaAllCharList.value], editCharacterForm],
+        scene: [sceneAPI, () => [store.drama?.scenes, store.scenes, dramaAllSceneList.value], editSceneForm],
+        prop: [propAPI, () => [store.drama?.props, store.props, dramaAllPropList.value], editPropForm],
+        character_library: [characterLibraryAPI, () => [charLibraryList.value], editCharLibraryForm],
+        scene_library: [sceneLibraryAPI, () => [sceneLibraryList.value], editSceneLibraryForm],
+        prop_library: [propLibraryAPI, () => [propLibraryList.value], editPropLibraryForm],
+      }[type]
+      const result = await api.get(id)
+      const fresh = result?.[type] || result
+      if (!fresh?.id) throw new Error('图片已保存，但资源刷新失败')
+      const patch = { image_url: fresh.image_url, local_path: fresh.local_path, ref_image: fresh.ref_image,
+        extra_images: fresh.extra_images, seedance2_asset: fresh.seedance2_asset }
+      for (const row of [item, ...lists().flatMap(list => list || []), form.value]) {
+        if (row && Number(row.id) === id) Object.assign(row, patch)
+      }
+    },
+  }
+}
+function storyboardImageContext(sb, image, slot) {
+  if (!image) return null
+  // Canonical resolver carries the actual field; history is intentionally never bound.
+  if (slot !== 'history' && image.source_slot) slot = image.source_slot
+  const source = { local_path: image.local_path || undefined, url: image.image_url || undefined,
+    image_id: image.id == null ? undefined : Number(image.id) }
+  return {
+    title: `AI 编辑分镜 #${sb.storyboard_number || sb.id} · ${slot === 'history' ? '历史图（不设为主图）' : slot}`,
+    source, target: { type: 'storyboard', id: Number(sb.id), slot },
+    expected_ref: slot === 'history' ? image.local_path || image.image_url || ''
+      : slot === 'composed' ? sb.composed_image || ''
+        : slot === 'last' ? sb.last_frame_local_path || sb.last_frame_image_url || ''
+          : sb.local_path || sb.image_url || '',
+    async onAdopted(receipt) {
+      const [result, history] = await Promise.all([
+        storyboardsAPI.get(sb.id), imagesAPI.list({ storyboard_id: sb.id, page: 1, page_size: 100 }),
+      ])
+      const fresh = result?.storyboard || result
+      if (Number(fresh?.id) !== Number(sb.id)) throw new Error('图片已保存，但分镜刷新失败')
+      const images = { ...sbImages.value, [sb.id]: history?.items || [] }
+      const { supplements, errors } = await loadStoryboardImageSupplements(fresh, images)
+      if (errors[slot]) throw new Error(errors[slot])
+      const fields = ['image_url', 'local_path', 'first_frame_image_id', 'last_frame_image_id', 'last_frame_image_url', 'last_frame_local_path', 'composed_image']
+      for (const row of [sb, ...(store.storyboards || []), ...(store.drama?.episodes || []).flatMap(ep => ep.storyboards || [])]) {
+        if (Number(row.id) === Number(sb.id)) for (const key of fields) row[key] = fresh[key]
+      }
+      sbImages.value = images
+      sbImageSupplements.value = { ...sbImageSupplements.value, [sb.id]: supplements }
+      sbImageLookupErrors.value = { ...sbImageLookupErrors.value, [sb.id]: errors }
+      restoreSelectionsFromBackend()
+      if (slot === 'history') adoptedHistoryPreview.value = { sb: fresh,
+        image: { id: receipt.image_id, image_url: receipt.image_url || receipt.url, local_path: receipt.local_path } }
+    },
+  }
 }
 function closeImagePreview() {
   previewImageUrl.value = null
@@ -3627,73 +3743,39 @@ function frameTypeForSlot(slot) {
   return slot === 'last' ? 'storyboard_last' : 'storyboard_first'
 }
 
-function resolveSbImageById(storyboardId, imageId) {
-  if (imageId == null) return null
-  const images = getSbAllImages(storyboardId)
-  return images.find((i) => i.id === imageId) || null
+const sbImageSupplements = ref({})
+const sbImageLookupErrors = ref({})
+function resolveStoryboardSlot(storyboardId, slot) {
+  const sb = (store.storyboards || []).find(b => Number(b.id) === Number(storyboardId))
+  return resolveSbImageRecord(sb, sbImages.value, slot, sbImageSupplements.value)
 }
-
-/** 首帧图（首尾帧模式下严格优先服务器绑定的 first_frame_image_id） */
 function getSbFirstImage(storyboardId) {
-  const images = getSbAllImages(storyboardId)
-  const sb = (store.storyboards || []).find((b) => b.id === storyboardId)
-
-  // 最高权威：服务器已绑定的首帧
-  if (sb?.first_frame_image_id != null) {
-    const bound = resolveSbImageById(storyboardId, sb.first_frame_image_id)
-    if (bound) return bound
-  }
-
-  const sel = sbSelectedImgId.value[storyboardId]
-  if (sel != null) {
-    const found = images.find((i) => i.id === sel)
-    if (found) return found
-  }
-
-  const typed = images.find((i) => i.frame_type === 'storyboard_first')
-  if (typed) return typed
-  // 不再回退到 images[0]，避免把尾帧图片误显示为首帧
-  return null
+  const sb = (store.storyboards || []).find(b => Number(b.id) === Number(storyboardId))
+  return resolveSbFirstImageRecord(sb, sbImages.value, sbImageSupplements.value)
 }
-
-/** 尾帧图（首尾帧模式下严格优先服务器绑定的 last_frame_image_id） */
 function getSbLastImage(storyboardId) {
-  const images = getSbAllImages(storyboardId)
-  const sb = (store.storyboards || []).find((b) => b.id === storyboardId)
-
-  // 最高权威：服务器已绑定的尾帧（后端 bindStoryboardFrameImage 正确写入的 last_frame_image_id）
-  if (sb?.last_frame_image_id != null) {
-    const bound = resolveSbImageById(storyboardId, sb.last_frame_image_id)
-    if (bound) return bound
-  }
-
-  // 仅在没有服务器绑定时才考虑手动选择（首尾帧生成后我们会主动清除手动选择）
-  const sel = sbSelectedLastImgId.value[storyboardId]
-  if (sel != null) {
-    const found = images.find((i) => i.id === sel)
-    if (found) return found
-  }
-
-  const typed = images.find((i) => i.frame_type === 'storyboard_last')
-  if (typed) return typed
-
-  if (sb?.last_frame_image_url || sb?.last_frame_local_path) {
-    return {
-      id: sb.last_frame_image_id,
-      image_url: sb.last_frame_image_url,
-      local_path: sb.last_frame_local_path,
-      frame_type: 'storyboard_last',
-    }
-  }
-  return null
+  return resolveStoryboardSlot(storyboardId, 'last')
+}
+async function loadStoryboardImageSupplements(sb, images) {
+  const supplements = {}, errors = {}
+  await Promise.all(['main', 'first', 'last'].map(async slot => {
+    const lookup = storyboardImageLookup(sb, images, slot)
+    if (!lookup) return
+    try {
+      const record = lookup.id != null ? await imagesAPI.get(lookup.id)
+        : (await imagesAPI.list(lookup.params))?.items?.[0]
+      if (record || lookup.id != null) supplements[slot] = validateStoryboardImage(record, sb, lookup.id)
+    } catch (e) { errors[slot] = e.message || '分镜图片不可用' }
+  }))
+  return { supplements, errors }
 }
 
 /** 该分镜是否有图（接口拉取的或 composed_image） */
 function hasSbImage(sb) {
   if (storyboardUseFirstLastFrame.value && !isSbUniversalMode(sb.id)) {
-    return !!(getSbFirstImage(sb.id) || (sb && (sb.composed_image || sb.image_url)))
+    return !!(getSbFirstImage(sb.id) || (sb.first_frame_image_id == null && sb.composed_image))
   }
-  return !!(getSbImage(sb.id) || (sb && (sb.composed_image || sb.image_url)))
+  return !!getSbImage(sb.id)
 }
 
 function hasSbFirstLastPair(sb) {
@@ -3708,14 +3790,7 @@ function getSbAllImages(storyboardId) {
 /** 取当前主图（首尾帧模式下等同首帧） */
 function getSbImage(storyboardId) {
   if (storyboardUseFirstLastFrame.value) return getSbFirstImage(storyboardId)
-  const images = getSbAllImages(storyboardId)
-  if (!images.length) return null
-  const selectedId = sbSelectedImgId.value[storyboardId]
-  if (selectedId != null) {
-    const found = images.find((i) => i.id === selectedId)
-    if (found) return found
-  }
-  return images[0]
+  return resolveStoryboardSlot(storyboardId, 'main')
 }
 /** 取该分镜下的四宫格整图记录 */
 /** 取该分镜下的四宫格整图记录 */
@@ -3816,10 +3891,13 @@ async function loadStoryboardMedia() {
   if (boards.length === 0) {
     sbImages.value = {}
     sbVideos.value = {}
+    sbImageSupplements.value = {}
+    sbImageLookupErrors.value = {}
     return
   }
   const nextImages = { ...sbImages.value }
   const nextVideos = { ...sbVideos.value }
+  const nextSupplements = {}, nextErrors = {}
   await Promise.all(
     boards.map(async (sb) => {
       try {
@@ -3829,7 +3907,11 @@ async function loadStoryboardMedia() {
         ])
         nextImages[sb.id] = (imgRes && imgRes.items) ? imgRes.items : []
         nextVideos[sb.id] = (vidRes && vidRes.items) ? vidRes.items : []
-      } catch (_) {
+        const { supplements, errors } = await loadStoryboardImageSupplements(sb, nextImages)
+        nextSupplements[sb.id] = supplements
+        nextErrors[sb.id] = errors
+      } catch (e) {
+        nextErrors[sb.id] = { main: e.message || '图片加载失败', first: e.message || '图片加载失败', last: e.message || '图片加载失败' }
         nextImages[sb.id] = []
         nextVideos[sb.id] = []
       }
@@ -3837,6 +3919,8 @@ async function loadStoryboardMedia() {
   )
   sbImages.value = nextImages
   sbVideos.value = nextVideos
+  sbImageSupplements.value = nextSupplements
+  sbImageLookupErrors.value = nextErrors
   // 从后端恢复主图选择
   restoreSelectionsFromBackend()
 }
@@ -3919,10 +4003,13 @@ async function loadSingleStoryboardMedia(sbId) {
       imagesAPI.list({ storyboard_id: sbId, page: 1, page_size: 100 }),
       videosAPI.list({ storyboard_id: sbId, page: 1, page_size: 50 })
     ])
-    sbImages.value = {
-      ...sbImages.value,
-      [sbId]: (imgRes && imgRes.items) ? imgRes.items : []
-    }
+    const images = { ...sbImages.value, [sbId]: imgRes?.items || [] }
+    const sb = (store.storyboards || []).find(b => Number(b.id) === Number(sbId))
+    if (!sb) return
+    const { supplements, errors } = await loadStoryboardImageSupplements(sb, images)
+    sbImages.value = images
+    sbImageSupplements.value = { ...sbImageSupplements.value, [sbId]: supplements }
+    sbImageLookupErrors.value = { ...sbImageLookupErrors.value, [sbId]: errors }
     sbVideos.value = {
       ...sbVideos.value,
       [sbId]: (vidRes && vidRes.items) ? vidRes.items : []
@@ -3951,7 +4038,7 @@ function restoreSelectionsFromBackend() {
   const boards = store.storyboards || []
   for (const sb of boards) {
     const images = getSbAllImages(sb.id)
-    if (sbSelectedImgId.value[sb.id] == null) {
+    if (sb.first_frame_image_id != null || sbSelectedImgId.value[sb.id] == null) {
       if (sb.first_frame_image_id != null) {
         sbSelectedImgId.value = { ...sbSelectedImgId.value, [sb.id]: sb.first_frame_image_id }
       } else {
@@ -3969,7 +4056,7 @@ function restoreSelectionsFromBackend() {
         }
       }
     }
-    if (sbSelectedLastImgId.value[sb.id] == null && sb.last_frame_image_id != null) {
+    if (sb.last_frame_image_id != null) {
       sbSelectedLastImgId.value = { ...sbSelectedLastImgId.value, [sb.id]: sb.last_frame_image_id }
     }
   }
@@ -5309,7 +5396,7 @@ function parseExtraImages(item) {
   if (!item?.extra_images) return []
   try {
     const arr = typeof item.extra_images === 'string' ? JSON.parse(item.extra_images) : item.extra_images
-    return Array.isArray(arr) ? arr.filter(Boolean) : []
+    return Array.isArray(arr) ? arr : []
   } catch { return [] }
 }
 
@@ -8203,6 +8290,7 @@ watch(
 </script>
 
 <style scoped>
+.image-edit-entry { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); }
 .script-workbench-unified {
   margin-bottom: 0;
 }

@@ -17,6 +17,15 @@ function list(db, query) {
     sql += ' AND status = ?';
     params.push(query.status);
   }
+  if (query.exclude_frame_types) {
+    const types = String(query.exclude_frame_types).split(',').map((v) => v.trim()).filter(Boolean);
+    const allowed = ['image_edit_history', 'quad_grid', 'nine_grid'];
+    if (types.some((v) => !allowed.includes(v))) throw new Error('无效的图片类型过滤');
+    if (types.length) {
+      sql += ` AND (frame_type IS NULL OR frame_type NOT IN (${types.map(() => '?').join(',')}))`;
+      params.push(...types);
+    }
+  }
   const countRow = db.prepare('SELECT COUNT(*) as total ' + sql).get(...params);
   const total = countRow.total || 0;
   const page = Math.max(1, parseInt(query.page, 10) || 1);
@@ -1583,7 +1592,8 @@ function getBackgroundsForEpisode(db, episodeId) {
   return rows;
 }
 
-function upload(db, log, req) {
+// Register only; callers decide whether/which storyboard slot to bind.
+function registerImage(db, req) {
   const now = new Date().toISOString();
   const frameType = req.frame_type ?? null;
   const info = db.prepare(
@@ -1592,7 +1602,7 @@ function upload(db, log, req) {
   ).run(
     req.storyboard_id ?? null,
     Number(req.drama_id) || 0,
-    'upload',
+    req.provider || 'upload',
     req.prompt || '',
     req.image_url || '',
     req.local_path ?? null,
@@ -1600,7 +1610,11 @@ function upload(db, log, req) {
     now,
     now
   );
-  const row = db.prepare('SELECT * FROM image_generations WHERE id = ?').get(info.lastInsertRowid);
+  return getById(db, info.lastInsertRowid);
+}
+
+function upload(db, log, req) {
+  const row = registerImage(db, req);
   if (row && row.storyboard_id) {
     try {
       const { bindStoryboardFrameImage } = require('./storyboardFrameBinding');
@@ -1681,6 +1695,7 @@ module.exports = {
   deleteById,
   getBackgroundsForEpisode,
   upload,
+  registerImage,
   processImageGeneration,
   aspectRatioToSize,
   syncStoryboardCharacters,

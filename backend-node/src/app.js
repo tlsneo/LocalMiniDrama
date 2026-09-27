@@ -21,6 +21,11 @@ function createApp() {
 
   const taskService = require('./services/taskService');
   taskService.failOrphanedAsyncTasksOnStartup(db, log);
+  const imageEditor = require('./services/imageEditService').createImageEditService(db, config, log);
+  imageEditor.recover();
+  setInterval(() => {
+    try { imageEditor.cleanup(); } catch (_) { log.warn('Image edit cleanup deferred'); }
+  }, 60 * 60 * 1000).unref();
 
   const { resumeProcessingVideoGenerations } = require('./services/videoService');
   resumeProcessingVideoGenerations(db, log);
@@ -63,7 +68,7 @@ function createApp() {
     });
   });
 
-  app.use('/api/v1', setupRouter(config, db, log));
+  app.use('/api/v1', setupRouter(config, db, log, imageEditor));
 
   // 前端静态资源（sxy：web/dist）；Electron 打包时可设 WEB_DIST_PATH
   const webDist = process.env.WEB_DIST_PATH || path.join(process.cwd(), '..', 'frontweb', 'dist');

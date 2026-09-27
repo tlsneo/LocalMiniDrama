@@ -31,10 +31,13 @@ function create(db, log, cfg) {
       return response.badRequest(res, '当前为厂商锁定模式，不允许添加配置');
     }
     const body = req.body || {};
-    if (!body.service_type || !body.name || !body.provider || !body.base_url) {
-      return response.badRequest(res, '缺少必填字段: service_type, name, provider, base_url');
+    const isImageEdit = body.service_type === 'image_edit';
+    if (!body.service_type || !body.name || !body.provider || (!isImageEdit && !body.base_url)) {
+      return response.badRequest(res, isImageEdit
+        ? '缺少必填字段: service_type, name, provider'
+        : '缺少必填字段: service_type, name, provider, base_url');
     }
-    if (body.api_key === undefined || body.api_key === null) {
+    if (!isImageEdit && (body.api_key === undefined || body.api_key === null)) {
       return response.badRequest(res, '缺少必填字段: api_key');
     }
     try {
@@ -65,9 +68,14 @@ function update(db, log, cfg) {
       body = allowed;
     }
 
-    const config = aiConfigService.updateConfig(db, log, id, body);
-    if (!config) return response.notFound(res, '配置不存在');
-    response.success(res, config);
+    try {
+      const config = aiConfigService.updateConfig(db, log, id, body);
+      if (!config) return response.notFound(res, '配置不存在');
+      response.success(res, config);
+    } catch (err) {
+      if (err.status === 400) return response.badRequest(res, err.message);
+      throw err;
+    }
   };
 }
 
@@ -106,7 +114,7 @@ function bulkUpdateKey(db, log, cfg) {
 function testConnection(log) {
   return async (req, res) => {
     const body = req.body || {};
-    if (!body.base_url || !body.api_key) {
+    if (body.service_type !== 'image_edit' && (!body.base_url || !body.api_key)) {
       return response.badRequest(res, '缺少 base_url 或 api_key');
     }
     try {
@@ -115,13 +123,16 @@ function testConnection(log) {
         api_key: body.api_key,
         model: body.model,
         provider: body.provider,
+        api_protocol: body.api_protocol,
         endpoint: body.endpoint,
+        query_endpoint: body.query_endpoint,
         service_type: body.service_type,
         settings: body.settings,
       });
       response.success(res, { message: '连接测试成功' });
     } catch (err) {
       log.error('AI config test connection failed', { error: err.message });
+      if (err.status === 503) return response.error(res, 503, 'IMAGE_EDIT_UNAVAILABLE', err.message);
       response.badRequest(res, '连接测试失败: ' + (err.message || '未知错误'));
     }
   };

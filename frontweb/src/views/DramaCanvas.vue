@@ -275,6 +275,7 @@ import '@vue-flow/minimap/dist/style.css'
 
 import { dramaAPI } from '@/api/drama'
 import { useTheme } from '@/composables/useTheme'
+import { useImageEditor } from '@/composables/useImageEditor'
 import { runWorkflowGroup } from '@/composables/useCanvasWorkflowRunner'
 import { CANVAS_CONTEXT_KEY } from '@/composables/useCanvasContext'
 import { useCanvasStoryboardMedia } from '@/composables/useCanvasStoryboardMedia'
@@ -321,7 +322,8 @@ import CanvasFlowAligner from '@/components/dramaCanvas/CanvasFlowAligner.vue'
 const route = useRoute()
 const router = useRouter()
 const { isDark, toggle: toggleTheme } = useTheme()
-const { imagesBySbId, videosBySbId, loadForDrama } = useCanvasStoryboardMedia()
+const { imagesBySbId, videosBySbId, imageSupplements, imageErrors, loadForDrama } = useCanvasStoryboardMedia()
+const { open: openImageEditor, busy: imageEditorBusy } = useImageEditor()
 
 const loading = ref(false)
 const drama = ref(null)
@@ -396,6 +398,8 @@ function rebuildGraph() {
     savedLayout: savedLayout.value,
     workflowGroups: workflowGroups.value,
     imagesBySbId: imagesBySbId.value,
+    imageSupplements: imageSupplements.value,
+    imageErrors: imageErrors.value,
     videosBySbId: videosBySbId.value,
   })
   let nextNodes = graph.nodes
@@ -496,6 +500,41 @@ function getCanvasGenerationOptions() {
   return {
     ...getDramaGenerationOptions(drama.value),
     imagesBySbId: imagesBySbId.value,
+    imageSupplements: imageSupplements.value,
+  }
+}
+
+// Adoption refresh throws on failure so the editor can retry synchronization, not adoption.
+async function refreshEditedImages() {
+  const layout = buildCanvasLayoutPayload(nodes.value, currentViewport.value, layoutCache.value)
+  const updated = await dramaAPI.get(dramaId.value)
+  await loadForDrama(updated, filterEpisodeId.value)
+  drama.value = updated
+  layoutCache.value = layout
+  syncWorkflowFromDrama()
+  rebuildGraph()
+}
+
+async function editCanvasImage({ storyboard, imageRecord, frameKind, kind, entity }) {
+  if (imageEditorBusy.value) return
+  const source = imageRecord || entity
+  if (!source?.local_path && !source?.image_url) return
+  const slot = frameKind || 'main'
+  const expected = entity ? (entity.local_path || entity.image_url || '')
+    : slot === 'composed' ? storyboard.composed_image
+      : slot === 'last' ? (storyboard.last_frame_local_path || storyboard.last_frame_image_url || '')
+        : (storyboard.local_path || storyboard.image_url || '')
+  try {
+    await openImageEditor({
+      title: entity ? `编辑${kind === 'character' ? '角色' : kind === 'scene' ? '场景' : '道具'}主图（共享资源）` : '编辑分镜图片',
+      source: { local_path: source.local_path, url: source.image_url, image_id: imageRecord?.id },
+      target: entity ? { type: kind, id: entity.id, slot: 'main' }
+        : { type: 'storyboard', id: storyboard.id, slot },
+      expected_ref: expected || '',
+      onAdopted: refreshEditedImages,
+    })
+  } catch (error) {
+    ElMessage.error(error.message || '无法打开图片编辑')
   }
 }
 
@@ -506,6 +545,9 @@ provide(CANVAS_CONTEXT_KEY, {
   drama,
   imagesBySbId,
   videosBySbId,
+  imageSupplements,
+  imageEditorBusy,
+  editImage: editCanvasImage,
   getGenerationOptions: getCanvasGenerationOptions,
   setFocusedNode: (nodeId) => {
     focusedNodeId.value = nodeId
@@ -628,6 +670,7 @@ const {
   drama,
   filterEpisodeId,
   imagesBySbId,
+  imageSupplements,
   videosBySbId,
   refreshCanvas,
   nodeStatus,
@@ -666,6 +709,8 @@ async function onAlignNodes() {
       episodeId: filterEpisodeId.value,
       workflowGroups: workflowGroups.value,
       imagesBySbId: imagesBySbId.value,
+      imageSupplements: imageSupplements.value,
+      imageErrors: imageErrors.value,
       videosBySbId: videosBySbId.value,
     })
     nodes.value = nodes.value.map((n) => {

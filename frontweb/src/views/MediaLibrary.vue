@@ -78,6 +78,7 @@
         <div class="media-info">
           <span class="media-name" :title="item.name">{{ item.name || '未命名' }}</span>
           <span class="media-meta">{{ formatSize(item.size) }}</span>
+          <el-button v-if="item.type === 'image'" size="small" :disabled="imageEditorBusy" @click.stop="editImage(item)">AI 编辑</el-button>
         </div>
       </div>
 
@@ -118,6 +119,7 @@
         <img v-else-if="previewItem" :src="itemUrl(previewItem)" class="preview-image" />
       </div>
       <div class="preview-meta">
+        <el-button v-if="previewItem?.type === 'image'" :disabled="imageEditorBusy" @click="editImage(previewItem)">AI 编辑</el-button>
         <div class="meta-row"><span>名称：</span>{{ previewItem?.name || '未命名' }}</div>
         <div class="meta-row"><span>大小：</span>{{ formatSize(previewItem?.size) }}</div>
         <div class="meta-row"><span>创建时间：</span>{{ previewItem?.created_at }}</div>
@@ -135,7 +137,9 @@ import {
 } from '@element-plus/icons-vue'
 import { uploadAPI } from '@/api/upload'
 import request from '@/utils/request'
+import { useImageEditor } from '@/composables/useImageEditor'
 
+const { open: openImageEditor, busy: imageEditorBusy } = useImageEditor()
 const loading = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref({ current: 0, total: 0 })
@@ -160,17 +164,28 @@ async function onUpload(e) {
   if (!files.length) return
   uploading.value = true
   uploadProgress.value = { current: 0, total: files.length }
+  let succeeded = 0
   for (const file of files) {
     try {
-      await uploadAPI.uploadImage(file)
-      uploadProgress.value.current++
+      const uploaded = await uploadAPI.uploadImage(file)
+      if (file.type.startsWith('image/')) {
+        if (!uploaded?.local_path) throw new Error('上传未返回图片路径')
+        await request.post('/assets', {
+          name: file.name, type: 'image', url: uploaded.url || '/static/' + uploaded.local_path,
+          local_path: uploaded.local_path, file_size: file.size, mime_type: file.type,
+          width: uploaded.width, height: uploaded.height,
+        })
+      }
+      succeeded++
     } catch (err) {
       ElMessage.warning(`${file.name} 上传失败: ${err.message}`)
+    } finally {
+      uploadProgress.value.current++
     }
   }
   uploading.value = false
   e.target.value = ''
-  ElMessage.success(`${files.length} 个素材上传完成`)
+  if (succeeded) ElMessage.success(`${succeeded} 个素材上传完成`)
   loadMedia()
 }
 
@@ -233,6 +248,23 @@ function toggleSelect(item) {
 function openPreview(item) {
   previewItem.value = item
   showPreview.value = true
+}
+
+async function editImage(item) {
+  if (item.type !== 'image' || imageEditorBusy.value) return
+  try {
+    await openImageEditor({
+      title: '编辑媒体素材图片',
+      source: { local_path: item.local_path, url: item.url || item.image_url },
+      target: { type: 'asset', id: item.id, slot: 'main' },
+      expected_ref: item.local_path || item.url || item.image_url || '',
+      onAdopted: async () => {
+        const updated = normalizeItem(await request.get(`/assets/${item.id}`))
+        mediaItems.value = mediaItems.value.map((row) => row.id === item.id ? updated : row)
+        if (previewItem.value?.id === item.id) previewItem.value = updated
+      },
+    })
+  } catch (error) { ElMessage.error(error.message || '无法打开图片编辑') }
 }
 
 async function deleteItem(item) {

@@ -1,10 +1,12 @@
 <template>
   <div class="app">
     <router-view />
+    <ImageEditDialog />
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
+import ImageEditDialog from '@/components/ImageEditDialog.vue'
 </script>
 
 <style>

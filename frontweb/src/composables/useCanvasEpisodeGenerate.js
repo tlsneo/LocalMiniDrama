@@ -33,6 +33,7 @@ export function useCanvasEpisodeGenerate(deps) {
     drama,
     filterEpisodeId,
     imagesBySbId,
+    imageSupplements,
     videosBySbId,
     refreshCanvas,
     nodeStatus,
@@ -92,6 +93,7 @@ export function useCanvasEpisodeGenerate(deps) {
     return {
       ...getDramaGenerationOptions(drama.value),
       imagesBySbId: imagesBySbId.value,
+      imageSupplements: imageSupplements?.value,
     }
   }
 
@@ -158,7 +160,7 @@ export function useCanvasEpisodeGenerate(deps) {
     }
     const boards = getStoryboardsForEpisode()
     const todo = boards.filter(
-      (sb) => sb.creation_mode !== 'universal' && !hasStoryboardImage(sb, imagesBySbId.value, drama.value)
+      (sb) => sb.creation_mode !== 'universal' && !hasStoryboardImage(sb, imagesBySbId.value, drama.value, imageSupplements?.value)
     )
     if (!todo.length) {
       ElMessage.info('当前集分镜均已有图片（全能模式分镜请直接生视频）')

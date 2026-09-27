@@ -157,7 +157,7 @@
       </div>
       <div v-loading="charLibraryLoading" class="library-list">
         <div v-for="item in charLibraryList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+          <div class="library-item-cover" @click="openImagePreview(item, 'character_library')">
             <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
             <span v-else class="library-item-placeholder">暂无图</span>
           </div>
@@ -182,7 +182,7 @@
       <el-form v-if="editCharLibraryForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openImagePreview(assetImageUrl(editCharLibraryForm))">
+            <div class="lib-img-thumb" @click="openImagePreview(editCharLibraryForm, 'character_library')">
               <img v-if="editCharLibraryForm.image_url || editCharLibraryForm.local_path" :src="assetImageUrl(editCharLibraryForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -211,7 +211,7 @@
       </div>
       <div v-loading="sceneLibraryLoading" class="library-list">
         <div v-for="item in sceneLibraryList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+          <div class="library-item-cover" @click="openImagePreview(item, 'scene_library')">
             <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
             <span v-else class="library-item-placeholder">暂无图</span>
           </div>
@@ -236,7 +236,7 @@
       <el-form v-if="editSceneLibraryForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openImagePreview(assetImageUrl(editSceneLibraryForm))">
+            <div class="lib-img-thumb" @click="openImagePreview(editSceneLibraryForm, 'scene_library')">
               <img v-if="editSceneLibraryForm.image_url || editSceneLibraryForm.local_path" :src="assetImageUrl(editSceneLibraryForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -266,7 +266,7 @@
       </div>
       <div v-loading="propLibraryLoading" class="library-list">
         <div v-for="item in propLibraryList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openImagePreview(assetImageUrl(item))">
+          <div class="library-item-cover" @click="openImagePreview(item, 'prop_library')">
             <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
             <span v-else class="library-item-placeholder">暂无图</span>
           </div>
@@ -291,7 +291,7 @@
       <el-form v-if="editPropLibraryForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openImagePreview(assetImageUrl(editPropLibraryForm))">
+            <div class="lib-img-thumb" @click="openImagePreview(editPropLibraryForm, 'prop_library')">
               <img v-if="editPropLibraryForm.image_url || editPropLibraryForm.local_path" :src="assetImageUrl(editPropLibraryForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -325,6 +325,7 @@
     <Teleport to="body">
       <div v-if="previewImageUrl" class="image-preview-overlay" @click="previewImageUrl = null">
         <img :src="previewImageUrl" alt="" class="image-preview-img" @click.stop="previewImageUrl = null" />
+        <el-button v-if="previewImageContext" class="image-edit-entry" type="primary" :disabled="imageEditBusy" @click.stop="editPreviewImage">AI 编辑</el-button>
       </div>
     </Teleport>
 
@@ -358,6 +359,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Delete, Setting, Plus, User, PictureFilled, Box, Sunny, Moon, ChatDotSquare, Download, Upload, QuestionFilled, FolderOpened, MagicStick, Files } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
+import { useImageEditor } from '@/composables/useImageEditor'
 import { dramaAPI } from '@/api/drama'
 import { characterLibraryAPI } from '@/api/characterLibrary'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
@@ -445,8 +447,36 @@ function assetImageUrl(item) {
   if (localPath) return '/static/' + localPath.replace(/^\//, '')
   return item.image_url || ''
 }
-function openImagePreview(url) {
-  if (url) previewImageUrl.value = url
+const { open: openImageEditor, busy: imageEditBusy } = useImageEditor()
+const previewImageContext = ref(null)
+function openImagePreview(item, type) {
+  if (!assetImageUrl(item)) return
+  previewImageUrl.value = assetImageUrl(item)
+  const id = Number(item.id)
+  previewImageContext.value = {
+    title: `AI 编辑素材 · ${item.name || item.location || id}`,
+    source: { local_path: item.local_path || undefined, url: item.image_url || undefined },
+    target: { type, id, slot: 'main' },
+    expected_ref: item.local_path || item.image_url || '',
+    async onAdopted() {
+      const [api, list, form] = {
+        character_library: [characterLibraryAPI, charLibraryList, editCharLibraryForm],
+        scene_library: [sceneLibraryAPI, sceneLibraryList, editSceneLibraryForm],
+        prop_library: [propLibraryAPI, propLibraryList, editPropLibraryForm],
+      }[type]
+      const fresh = await api.get(id)
+      if (!fresh?.id) throw new Error('图片已保存，但素材刷新失败')
+      const patch = { image_url: fresh.image_url, local_path: fresh.local_path }
+      for (const row of [item, ...list.value, form.value]) {
+        if (row && Number(row.id) === id) Object.assign(row, patch)
+      }
+    },
+  }
+}
+async function editPreviewImage() {
+  const context = previewImageContext.value
+  previewImageUrl.value = null
+  try { await openImageEditor(context) } catch (e) { ElMessage.error(e.message || '无法打开图片编辑') }
 }
 
 // 公共角色库
@@ -796,6 +826,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.image-edit-entry { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); }
 .film-list {
   min-height: 100vh;
   background: #08080d;

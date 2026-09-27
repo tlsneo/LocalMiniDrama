@@ -210,6 +210,25 @@ function applyLibraryItemToCharacter(db, log, characterId, libraryItemId) {
   return { ok: true };
 }
 
+function putCharacterImage(db, log, characterId, body) {
+  return db.transaction(() => {
+    const prev = db.prepare('SELECT * FROM characters WHERE id = ? AND deleted_at IS NULL').get(Number(characterId));
+    if (!prev) return { ok: false, error: 'character not found' };
+    if (!db.prepare('SELECT id FROM dramas WHERE id = ? AND deleted_at IS NULL').get(prev.drama_id)) {
+      return { ok: false, error: 'drama not found' };
+    }
+    const fields = ['image_url', 'local_path', 'extra_images', 'ref_image'].filter((key) => body[key] !== undefined);
+    if (!fields.length) return { ok: true };
+    seedance2AssetGuards.markStaleOnCharacterMainImageDrift(db, log, prev, {
+      image_url: body.image_url !== undefined ? body.image_url : prev.image_url,
+      local_path: body.local_path !== undefined ? body.local_path : prev.local_path,
+    });
+    db.prepare(`UPDATE characters SET ${fields.map((key) => key + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`)
+      .run(...fields.map((key) => body[key] ?? null), new Date().toISOString(), Number(characterId));
+    return { ok: true };
+  })();
+}
+
 function uploadCharacterImage(db, log, characterId, imageUrl, opts = {}) {
   const charRow = db
     .prepare('SELECT id, drama_id, local_path, image_url, seedance2_asset FROM characters WHERE id = ? AND deleted_at IS NULL')
@@ -1052,6 +1071,7 @@ module.exports = {
   deleteLibraryItem,
   applyLibraryItemToCharacter,
   uploadCharacterImage,
+  putCharacterImage,
   addCharacterToLibrary,
   addCharacterToMaterialLibrary,
   updateCharacter,

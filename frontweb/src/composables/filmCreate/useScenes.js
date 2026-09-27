@@ -3,6 +3,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { sceneAPI } from '@/api/scenes'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
 import { uploadAPI } from '@/api/upload'
+import { ensureReferenceUploaded, createSceneAndSaveReference } from '@/utils/filmCreateReference.js'
+import { useImageEditor } from '@/composables/useImageEditor'
 import { useGenerationTaskStore, GEN_RESOURCE } from '@/stores/generationTaskStore'
 import { buildExtractTaskMeta, isEpisodeExtractRunning } from '@/composables/useGenerationTaskSync'
 
@@ -39,15 +41,7 @@ export function useScenes(deps) {
     }
   }
 
-  function dataUrlToFile(dataUrl, filename) {
-    const arr = dataUrl.split(',')
-    const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) u8arr[n] = bstr.charCodeAt(n)
-    return new File([u8arr], filename || 'reference.png', { type: mime })
-  }
+  const { busy: imageEditBusy } = useImageEditor()
 
   // ── 场景弹窗状态 ──────────────────────────────────────
   const showEditScene = ref(false)
@@ -206,17 +200,12 @@ export function useScenes(deps) {
   async function saveSceneRefImageIfAny(sceneId) {
     const refImg = addSceneRefImage.value
     if (!refImg || !sceneId) return
-    try {
-      const file = dataUrlToFile(refImg.dataUrl, refImg.filename || 'reference.png')
-      const uploadRes = await uploadAPI.uploadImage(file, { dramaId: dramaId.value })
-      const refPath = uploadRes.local_path || uploadRes.url || ''
-      await sceneAPI.putRefImage(sceneId, refPath)
-    } catch (e) {
-      console.warn('[saveSceneRefImage] 保存参考图失败:', e.message)
-    }
+    const refPath = await ensureReferenceUploaded(refImg, file => uploadAPI.uploadImage(file, { dramaId: dramaId.value }))
+    await sceneAPI.putRefImage(sceneId, refPath)
   }
 
   async function clearSceneRefImage() {
+    if (imageEditBusy.value) return
     const form = editSceneForm.value
     if (!form?.id) return
     try {
@@ -246,6 +235,7 @@ export function useScenes(deps) {
   }
 
   async function submitEditScene() {
+    if (imageEditBusy.value) return
     const form = editSceneForm.value
     if (!form?.location?.trim() || !store.dramaId) return
     editSceneSaving.value = true
@@ -261,20 +251,13 @@ export function useScenes(deps) {
         await saveSceneRefImageIfAny(form.id)
         ElMessage.success('场景已保存')
       } else {
-        await sceneAPI.create({
+        await createSceneAndSaveReference(form, {
           drama_id: store.dramaId,
           episode_id: currentEpisodeId.value || undefined,
           location: form.location.trim(),
           time: form.time || undefined,
           prompt: form.prompt || undefined
-        })
-        await loadDrama()
-        if (addSceneRefImage.value) {
-          const newScene = (store.drama?.scenes || []).find(
-            s => s.location === form.location.trim() && (s.time || '') === (form.time || '')
-          )
-          if (newScene?.id) await saveSceneRefImageIfAny(newScene.id)
-        }
+        }, payload => sceneAPI.create(payload), saveSceneRefImageIfAny)
         ElMessage.success('场景已添加')
       }
       await loadDrama()

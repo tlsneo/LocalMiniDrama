@@ -24,6 +24,7 @@
           <span v-if="statusChip" class="status-chip" :class="'st-' + statusChip.key">{{ statusChip.label }}</span>
         </div>
         <div class="kind">{{ kindLabel }}</div>
+        <el-button v-if="thumbUrl" size="small" class="nodrag nopan" :disabled="isNodeBusy || ctx?.imageEditorBusy?.value" @click.stop="ctx?.editImage?.({ kind: data.kind, entity: data.entity })">AI 编辑</el-button>
       </div>
     </div>
     <CanvasAssetPanel

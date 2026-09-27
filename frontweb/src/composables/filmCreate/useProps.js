@@ -3,6 +3,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { propAPI } from '@/api/props'
 import { propLibraryAPI } from '@/api/propLibrary'
 import { uploadAPI } from '@/api/upload'
+import { ensureReferenceUploaded, referenceExtractionInput } from '@/utils/filmCreateReference.js'
+import { useImageEditor } from '@/composables/useImageEditor'
 import { useGenerationTaskStore, GEN_RESOURCE } from '@/stores/generationTaskStore'
 import { buildExtractTaskMeta, isEpisodeExtractRunning } from '@/composables/useGenerationTaskSync'
 
@@ -37,15 +39,7 @@ export function useProps(deps) {
     }
   }
 
-  function dataUrlToFile(dataUrl, filename) {
-    const arr = dataUrl.split(',')
-    const mime = (arr[0].match(/:(.*?);/) || [])[1] || 'image/png'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) u8arr[n] = bstr.charCodeAt(n)
-    return new File([u8arr], filename || 'reference.png', { type: mime })
-  }
+  const { busy: imageEditBusy } = useImageEditor()
 
   // ── 道具弹窗状态 ──────────────────────────────────────
   const showAddProp = ref(false)
@@ -188,17 +182,12 @@ export function useProps(deps) {
   async function savePropRefImageIfAny(propId) {
     const refImg = addPropRefImage.value
     if (!refImg || !propId) return
-    try {
-      const file = dataUrlToFile(refImg.dataUrl, refImg.filename || 'reference.png')
-      const uploadRes = await uploadAPI.uploadImage(file, { dramaId: dramaId.value })
-      const refPath = uploadRes.local_path || uploadRes.url || ''
-      await propAPI.putRefImage(propId, refPath)
-    } catch (e) {
-      console.warn('[savePropRefImage] 保存参考图失败:', e.message)
-    }
+    const refPath = await ensureReferenceUploaded(refImg, file => uploadAPI.uploadImage(file, { dramaId: dramaId.value }))
+    await propAPI.putRefImage(propId, refPath)
   }
 
   async function clearPropRefImage() {
+    if (imageEditBusy.value) return
     const form = editPropForm.value
     if (!form?.id) return
     try {
@@ -228,6 +217,7 @@ export function useProps(deps) {
   }
 
   async function submitEditProp() {
+    if (imageEditBusy.value) return
     if (!editPropForm.value?.id) return
     editPropSaving.value = true
     try {
@@ -249,6 +239,7 @@ export function useProps(deps) {
   }
 
   async function submitAddProp() {
+    if (imageEditBusy.value) return
     const name = (addPropForm.value.name || '').trim()
     if (!name || !store.dramaId) return
     addPropSaving.value = true
@@ -555,7 +546,7 @@ export function useProps(deps) {
     extractingPropAddDesc.value = true
     try {
       const entityName = addPropForm.value?.name || ''
-      const res = await uploadAPI.extractDescriptionFromImage('prop', refImage.dataUrl, entityName)
+      const res = await uploadAPI.extractDescriptionFromImage('prop', await referenceExtractionInput(refImage), entityName)
       if (res?.description) {
         addPropForm.value.description = res.description
         ElMessage.success('已从参考图提取特征描述')

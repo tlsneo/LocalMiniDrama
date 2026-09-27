@@ -115,6 +115,7 @@
     </div>
 
     <div class="panel-actions">
+      <el-button v-if="previewUrl" size="small" :disabled="generating || !!nodeBusy || ctx?.imageEditorBusy?.value" @click.stop="ctx?.editImage?.({ kind, entity })">AI 编辑主图</el-button>
       <el-button size="small" :loading="saving" @click.stop="saveAsset">保存</el-button>
       <el-button
         v-if="canGenerate || generating"
@@ -126,7 +127,7 @@
         生成参考图
       </el-button>
       <el-button size="small" plain @click.stop="highlightRelated">关联分镜</el-button>
-      <el-button size="small" type="danger" plain @click.stop="deleteAsset">删除</el-button>
+      <el-button size="small" type="danger" plain :disabled="ctx?.imageEditorBusy?.value" @click.stop="deleteAsset">删除</el-button>
     </div>
   </div>
 </template>

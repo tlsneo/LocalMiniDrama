@@ -63,7 +63,7 @@
               一键换Key
             </el-button>
           </div>
-          <p class="default-tip">每种服务类型仅有一个默认配置：文本用于生成故事；文本生成图片用于角色/场景/道具图；分镜图片生成用于分镜图（支持参考图）；视频用于生成视频；语音合成 TTS 用于分镜配音；即梦2角色认证用于创作页 SD2 认证（网关 Token）；SD2 资产库用于官方 ModelArk 私有资产（在未配置即梦2角色认证时供 SD2 认证使用）。</p>
+          <p class="default-tip">每种服务类型仅有一个默认配置：文本用于生成故事；文本生成图片用于角色/场景/道具图；分镜图片生成用于分镜图（支持参考图）；图片编辑独立配置（协议尚未对接）；视频用于生成视频；语音合成 TTS 用于分镜配音；即梦2角色认证用于创作页 SD2 认证（网关 Token）；SD2 资产库用于官方 ModelArk 私有资产（在未配置即梦2角色认证时供 SD2 认证使用）。</p>
           <el-table
             v-loading="loading"
             :data="list"
@@ -85,7 +85,7 @@
                 <span :class="['type-badge', 'type-' + row.service_type]">
                   <el-icon class="type-icon">
                     <ChatDotRound v-if="row.service_type === 'text'" />
-                    <Picture v-else-if="row.service_type === 'image'" />
+                    <Picture v-else-if="row.service_type === 'image' || row.service_type === 'image_edit'" />
                     <Film v-else-if="row.service_type === 'storyboard_image'" />
                     <VideoCamera v-else-if="row.service_type === 'video'" />
                     <Microphone v-else-if="row.service_type === 'tts'" />
@@ -209,6 +209,15 @@
       :close-on-click-modal="false"
       @closed="resetForm"
     >
+      <el-alert
+        v-if="form.service_type === 'image_edit'"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="图片编辑协议尚未对接"
+        description="仅保存自定义配置；地址、鉴权、接口路径及模型能力待协议确定。当前不能测试或调用，不会回退到普通生图。"
+        style="margin-bottom: 12px"
+      />
       <!-- 锁定模式：只展示 api_key 和 default_model -->
       <template v-if="vendorLock.enabled">
         <el-descriptions :column="1" border style="margin-bottom: 16px">
@@ -217,7 +226,7 @@
           <el-descriptions-item label="厂商">{{ form.provider }}</el-descriptions-item>
         </el-descriptions>
         <el-form ref="formRef" :model="form" label-width="100px">
-          <el-form-item prop="api_key" :rules="[{ required: true, message: '请输入 API Key', trigger: 'blur' }]">
+          <el-form-item prop="api_key" :rules="[{ required: form.service_type !== 'image_edit', message: '请输入 API Key', trigger: 'blur' }]">
             <template #label><span class="form-label-tip">API Key</span></template>
             <el-input
               v-model="form.api_key"
@@ -263,6 +272,7 @@
                     <b>文本/对话</b>：用于 AI 生成故事剧本<br>
                     <b>文本生成图片</b>：角色、场景、道具的图片生成（不支持参考图）<br>
                     <b>分镜图片生成</b>：生成分镜图片，支持传入角色参考图<br>
+                    <b>图片编辑</b>：修改已有图片，协议和模型能力尚未就绪<br>
                     <b>视频生成</b>：根据分镜图生成视频片段<br>
                     <b>语音合成 TTS</b>：为分镜对白自动合成语音（点分镜配音按钮时使用）<br>
                     <b>即梦2角色认证</b>：将角色主图登记到即梦业务素材库（SD2 认证），仅填网关 URL 与 Token
@@ -272,10 +282,11 @@
               </el-tooltip>
             </span>
           </template>
-          <el-select v-model="form.service_type" placeholder="选择类型" style="width: 100%" @change="onServiceTypeChange">
+          <el-select v-model="form.service_type" :disabled="!!editingId" placeholder="选择类型" style="width: 100%" @change="onServiceTypeChange">
             <el-option label="文本/对话" value="text" />
             <el-option label="文本生成图片" value="image" />
             <el-option label="分镜图片生成" value="storyboard_image" />
+            <el-option label="图片编辑" value="image_edit" />
             <el-option label="视频生成" value="video" />
             <el-option label="语音合成 TTS" value="tts" />
             <el-option label="即梦2角色认证" value="jimeng2_character_auth" />
@@ -287,9 +298,12 @@
               <el-tooltip placement="top" popper-class="cfg-tip-popper">
                 <template #content>
                   <div class="cfg-tip-content">
-                    从下拉选择预设厂商，会自动填入 Base URL 和模型列表。<br>
-                    也可直接输入自定义厂商名（需手动填写其他字段）。<br>
-                    <b>推荐</b>：通义千问 / 火山引擎，国内访问稳定。
+                    <template v-if="form.service_type === 'image_edit'">仅记录自定义厂商名；编辑协议尚未对接，没有可用预设。</template>
+                    <template v-else>
+                      从下拉选择预设厂商，会自动填入 Base URL 和模型列表。<br>
+                      也可直接输入自定义厂商名（需手动填写其他字段）。<br>
+                      <b>推荐</b>：通义千问 / 火山引擎，国内访问稳定。
+                    </template>
                   </div>
                 </template>
                 <el-icon class="tip-icon"><QuestionFilled /></el-icon>
@@ -298,7 +312,7 @@
           </template>
           <el-select
             v-model="form.provider"
-            placeholder="选择预设厂商（自动填充 URL 和模型）"
+            :placeholder="form.service_type === 'image_edit' ? '输入自定义厂商名（协议待对接）' : '选择预设厂商（自动填充 URL 和模型）'"
             clearable
             filterable
             allow-create
@@ -316,7 +330,7 @@
           </el-select>
         </el-form-item>
         <!-- 接口规范：仅图片/分镜/视频类型显示，预设厂商自动填充；自定义厂商必选 -->
-        <el-form-item v-if="form.service_type !== 'text' && form.service_type !== 'tts' && form.service_type !== 'jimeng2_character_auth'">
+        <el-form-item v-if="form.service_type !== 'text' && form.service_type !== 'tts' && form.service_type !== 'jimeng2_character_auth' && form.service_type !== 'image_edit'">
           <template #label>
             <span class="form-label-tip">接口规范
               <el-icon class="tip-icon" style="cursor:pointer;color:#409eff" @click="showProtocolHelp = true"><QuestionFilled /></el-icon>
@@ -513,7 +527,8 @@ input_reference = (图片文件，可选)</pre>
               <el-tooltip placement="top" popper-class="cfg-tip-popper">
                 <template #content>
                   <div class="cfg-tip-content">
-                    <template v-if="form.service_type === 'jimeng2_character_auth'">
+                    <template v-if="form.service_type === 'image_edit'">编辑服务地址待协议确定，可留空；不会自动填入生成服务地址。</template>
+                    <template v-else-if="form.service_type === 'jimeng2_character_auth'">
                       即梦业务素材库网关的<b>根地址</b>（不含 <code>/api/business/v1</code> 路径）。须与素材库实际部署一致。
                     </template>
                     <template v-else>
@@ -528,7 +543,7 @@ input_reference = (图片文件，可选)</pre>
           </template>
           <el-input
             v-model="form.base_url"
-            :placeholder="form.service_type === 'jimeng2_character_auth' ? '如 https://your-gateway.com' : '选择预设厂商后自动填充，可修改'"
+            :placeholder="form.service_type === 'image_edit' ? '可留空，待编辑协议确定' : (form.service_type === 'jimeng2_character_auth' ? '如 https://your-gateway.com' : '选择预设厂商后自动填充，可修改')"
           />
         </el-form-item>
         <el-form-item prop="api_key">
@@ -537,7 +552,8 @@ input_reference = (图片文件，可选)</pre>
               <el-tooltip placement="top" popper-class="cfg-tip-popper">
                 <template #content>
                   <div class="cfg-tip-content">
-                    <template v-if="form.service_type === 'jimeng2_character_auth'">
+                    <template v-if="form.service_type === 'image_edit'">鉴权方式待编辑协议确定，可留空；保存密钥不代表已支持该服务。</template>
+                    <template v-else-if="form.service_type === 'jimeng2_character_auth'">
                       素材库要求的 <code>Authorization: Bearer …</code> Token，由网关或即梦侧签发。
                     </template>
                     <template v-else>
@@ -554,7 +570,7 @@ input_reference = (图片文件，可选)</pre>
           <el-input
             v-model="form.api_key"
             type="password"
-            :placeholder="form.service_type === 'jimeng2_character_auth' ? 'Bearer Token' : (form.provider === 'jimeng_ai_api' ? '即梦 Session，多个用英文逗号分隔' : 'API 密钥')"
+            :placeholder="form.service_type === 'image_edit' ? '可留空，鉴权方式待确定' : (form.service_type === 'jimeng2_character_auth' ? 'Bearer Token' : (form.provider === 'jimeng_ai_api' ? '即梦 Session，多个用英文逗号分隔' : 'API 密钥'))"
             show-password
           />
         </el-form-item>
@@ -683,7 +699,7 @@ input_reference = (图片文件，可选)</pre>
         </template>
 
         <!-- 端点配置：视频必填（自定义厂商）；图片/分镜在使用代理或特殊厂商时填写 -->
-        <template v-if="form.service_type !== 'text' && form.service_type !== 'tts' && form.service_type !== 'jimeng2_character_auth'">
+        <template v-if="form.service_type !== 'text' && form.service_type !== 'tts' && form.service_type !== 'jimeng2_character_auth' && form.service_type !== 'image_edit'">
           <el-form-item>
             <template #label>
               <span class="form-label-tip">提交端点
@@ -752,15 +768,18 @@ input_reference = (图片文件，可选)</pre>
               <el-tooltip placement="top" popper-class="cfg-tip-popper">
                 <template #content>
                   <div class="cfg-tip-content">
-                    该厂商下可用的模型，多个用逗号或换行分隔。<br>
-                    可从上方「追加预设模型」下拉快速添加，也可手动输入。
+                    <template v-if="form.service_type === 'image_edit'">可记录自定义模型名，不代表已验证文字改图或遮罩能力；能力以未来实际协议为准。</template>
+                    <template v-else>
+                      该厂商下可用的模型，多个用逗号或换行分隔。<br>
+                      可从上方「追加预设模型」下拉快速添加，也可手动输入。
+                    </template>
                   </div>
                 </template>
                 <el-icon class="tip-icon"><QuestionFilled /></el-icon>
               </el-tooltip>
             </span>
           </template>
-          <div class="model-row">
+          <div v-if="form.service_type !== 'image_edit'" class="model-row">
             <el-select
               v-model="presetModelPick"
               placeholder="追加预设模型"
@@ -772,7 +791,7 @@ input_reference = (图片文件，可选)</pre>
               <el-option v-for="m in availableModels" :key="m" :label="m" :value="m" />
             </el-select>
           </div>
-          <el-input v-model="form.modelText" type="textarea" :rows="2" placeholder="选择预设厂商后自动填入，可编辑；多个用逗号或换行分隔" />
+          <el-input v-model="form.modelText" type="textarea" :rows="2" :placeholder="form.service_type === 'image_edit' ? '自定义模型名，可留空；多个用逗号或换行分隔' : '选择预设厂商后自动填入，可编辑；多个用逗号或换行分隔'" />
         </el-form-item>
         <el-form-item>
           <template #label>
@@ -1215,6 +1234,17 @@ watch(
 
 function onServiceTypeChange() {
   const st = form.value.service_type || 'text'
+  form.value.api_protocol = ''
+  form.value.endpoint = ''
+  form.value.query_endpoint = ''
+  if (st === 'image_edit') {
+    Object.assign(form.value, {
+      provider: '', base_url: '', api_key: '', modelText: '', default_model: '',
+      voice_id: '', group_id: '', kling_access_key: '', kling_secret_key: '', kling_secret_key_base64: false,
+    })
+    presetModelPick.value = ''
+    return
+  }
   if (st === 'jimeng2_character_auth') {
     if (!form.value.provider || form.value.provider === CUSTOM_PROVIDER_SENTINEL) {
       form.value.provider = 'jimeng_material_api'
@@ -1259,11 +1289,12 @@ const rules = computed(() => ({
   service_type: [{ required: true, message: '请选择服务类型', trigger: 'change' }],
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   provider: [{ required: true, message: '请选择或输入厂商', trigger: 'change' }],
-  base_url: [{ required: true, message: '请输入 Base URL', trigger: 'blur' }],
+  base_url: [{ required: form.value.service_type !== 'image_edit', message: '请输入 Base URL', trigger: 'blur' }],
   api_key: [
     {
       validator: (_rule, v, cb) => {
         const st = form.value.service_type
+        if (st === 'image_edit') return cb()
         if (st === 'jimeng2_character_auth') {
           if (v != null && String(v).trim()) return cb()
           return cb(new Error('请填写 Token'))
@@ -1391,7 +1422,7 @@ const providerProtocolMap = {
 
 /** 厂商 id → 默认 Base URL（与参考前端 AIConfigDialog 757-775 一致） */
 function getBaseUrlForProvider(provider) {
-  if (!provider) return ''
+  if (!provider || form.value.service_type === 'image_edit') return ''
   const p = String(provider).toLowerCase()
   if (p === 'gemini' || p === 'google') return 'https://generativelanguage.googleapis.com'
   if (p === 'minimax_h3') return 'https://api.minimaxi.com'
@@ -1477,6 +1508,7 @@ const availableModels = computed(() => {
 /** 根据当前厂商/协议/base_url 推算实际将使用的接口地址，供用户核对 */
 const endpointPreviewInfo = computed(() => {
   const { provider, api_protocol, base_url, service_type, endpoint, query_endpoint } = form.value
+  if (service_type === 'image_edit') return null
   const p = String(provider || '').toLowerCase()
   const proto = api_protocol || providerProtocolMap[p] || ''
   const base = (base_url || '').replace(/\/$/, '')
@@ -1631,6 +1663,7 @@ function onProviderChange(providerId) {
     return
   }
   const st = form.value.service_type || 'text'
+  if (st === 'image_edit') return
   const p = (providerConfigs[st] || []).find((x) => x.id === providerId)
   if (!p) {
     form.value.base_url = ''
@@ -1710,6 +1743,7 @@ function serviceTypeLabel(t) {
     text: '文本',
     image: '文本生成图片',
     storyboard_image: '分镜图片生成',
+    image_edit: '图片编辑',
     video: '视频',
     tts: '语音合成 TTS',
     jimeng2_character_auth: '即梦2角色认证',
@@ -1829,7 +1863,8 @@ function openEdit(row) {
 }
 
 async function submit() {
-  await formRef.value?.validate?.().catch(() => {})
+  const valid = await formRef.value?.validate?.().catch(() => false)
+  if (!valid) return
   saving.value = true
   try {
     let modelList = parseModelText(form.value.modelText)
@@ -1993,7 +2028,9 @@ async function openTest(row) {
       api_key: row.api_key,
       model: Array.isArray(row.model) ? row.model[0] : row.model,
       provider: row.provider,
+      api_protocol: row.api_protocol,
       endpoint: row.endpoint,
+      query_endpoint: row.query_endpoint,
       service_type: row.service_type,
       settings: row.settings
     })
@@ -2302,7 +2339,8 @@ onMounted(() => {
   border-color: rgba(59, 130, 246, 0.25);
 }
 /* 文本生成图片 — 绿色 */
-.type-image {
+.type-image,
+.type-image_edit {
   background: rgba(16, 185, 129, 0.12);
   color: #10b981;
   border-color: rgba(16, 185, 129, 0.25);

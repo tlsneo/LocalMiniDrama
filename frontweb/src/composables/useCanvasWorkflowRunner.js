@@ -2,7 +2,6 @@ import { taskAPI } from '@/api/task'
 import { imagesAPI } from '@/api/images'
 import { videosAPI } from '@/api/videos'
 import request from '@/utils/request'
-import { storyboardImageUrl } from '@/utils/mediaUrl'
 import {
   DEFAULT_PIPELINE,
   findStoryboardInDrama,
@@ -49,8 +48,12 @@ export async function runImageStep(drama, sb, genOpts) {
 export async function runVideoStep(drama, sb, genOpts) {
   const useFirstLast = dramaUsesFirstLastFrame(drama)
   const imagesBySbId = genOpts?.imagesBySbId || {}
-  const { first, last } = sbVideoFirstLastUrls(sb, imagesBySbId, useFirstLast)
-  const imgPath = first || storyboardImageUrl(sb)
+  const { first, last } = sbVideoFirstLastUrls(sb, imagesBySbId, useFirstLast, genOpts?.imageSupplements)
+  if (sb.creation_mode !== 'universal' && ((sb.first_frame_image_id != null && !first)
+    || (useFirstLast && sb.last_frame_image_id != null && !last))) {
+    throw new Error('绑定的分镜图片不可用，请重新加载后重试')
+  }
+  const imgPath = first
   if (!imgPath && !sb.video_prompt && !last) {
     throw new Error(`分镜 #${sb.storyboard_number ?? sb.id} 缺少分镜图，无法生成视频`)
   }

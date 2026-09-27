@@ -13,7 +13,8 @@
       </template>
       <template v-else-if="data.kind === 'image'">
         <img v-if="data.url" :src="data.url" alt="" class="media-img" />
-        <div v-else class="empty">无分镜图</div>
+        <div v-else class="empty">{{ data.imageError || '无分镜图' }}</div>
+        <el-button v-if="data.url" size="small" class="nodrag nopan" :disabled="isNodeBusy || ctx?.imageEditorBusy?.value" @click.stop="ctx?.editImage?.(data)">AI 编辑</el-button>
       </template>
       <template v-else-if="data.kind === 'video'">
         <video v-if="data.url" :src="data.url" class="media-vid" muted playsinline />
@@ -33,6 +34,9 @@
       :storyboard="data.storyboard"
       :summary="data.summary"
       :url="data.url"
+      :frame-kind="data.frameKind"
+      :image-record="data.imageRecord"
+      :image-error="data.imageError"
       :audio-type="data.audioType"
     />
   </div>

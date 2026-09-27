@@ -1,6 +1,6 @@
-import { parseCanvasLayout, resolveNodePosition } from './canvasLayout'
-import { getStoryboardGroupMap, parseWorkflowGroups } from './canvasWorkflow'
-import { assetImageUrl, storyboardImageUrl, storyboardVideoUrl, audioUrl } from './mediaUrl'
+import { parseCanvasLayout, resolveNodePosition } from './canvasLayout.js'
+import { getStoryboardGroupMap, parseWorkflowGroups } from './canvasWorkflow.js'
+import { storyboardVideoUrl, audioUrl } from './mediaUrl.js'
 import {
   dramaUsesFirstLastFrame,
   imageRecordUrl,
@@ -9,7 +9,7 @@ import {
   resolveSbMainImageRecord,
   resolveSbVideoRecord,
   videoRecordUrl,
-} from './storyboardMedia'
+} from './storyboardMedia.js'
 
 const ASSET_X = 48
 const SCRIPT_OFFSET_X = 248
@@ -138,9 +138,9 @@ function appendUniversalNode(nodes, edges, ctx) {
 
 function appendMediaImageNode(nodes, edges, ctx) {
   const {
-    savedLayout, sb, sbId, fromId, mediaX, mediaY, imgId, url, frameKind, frameLabel,
+    savedLayout, sb, sbId, fromId, mediaX, mediaY, imgId, url, frameKind, frameLabel, imageRecord, imageError,
   } = ctx
-  if (!url) return fromId
+  if (!url && !imageError) return fromId
   nodes.push(makeNode({
     id: imgId,
     type: 'canvasMedia',
@@ -149,8 +149,10 @@ function appendMediaImageNode(nodes, edges, ctx) {
       kind: 'image',
       storyboard: sb,
       url,
-      frameKind: frameKind || null,
+      frameKind: imageRecord?.source_slot || frameKind || 'main',
       frameLabel: frameLabel || null,
+      imageRecord,
+      imageError,
     },
   }))
   edges.push(makeEdge({
@@ -168,6 +170,8 @@ function buildEpisodePipeline(episode, savedLayout, startY, options = {}) {
   const storyboards = episode.storyboards || []
   const groupMap = options.workflowGroupMap || new Map()
   const imagesBySbId = options.imagesBySbId || {}
+  const imageSupplements = options.imageSupplements || {}
+  const imageErrors = options.imageErrors || {}
   const videosBySbId = options.videosBySbId || {}
   const useFirstLastFrame = options.useFirstLastFrame ?? false
 
@@ -250,31 +254,37 @@ function buildEpisodePipeline(episode, savedLayout, startY, options = {}) {
       const useFirstLast = useFirstLastFrame
 
       if (useFirstLast) {
-        const firstUrl = imageRecordUrl(resolveSbFirstImageRecord(sb, imagesBySbId))
-        if (firstUrl) {
+        const firstRecord = resolveSbFirstImageRecord(sb, imagesBySbId, imageSupplements)
+        const firstUrl = imageRecordUrl(firstRecord)
+        const firstError = imageErrors[sb.id]?.first || (!firstUrl && sb.first_frame_image_id != null ? '绑定的首帧图片不可用' : '')
+        if (firstUrl || firstError) {
           const imgId = `sbimg-first:${sb.id}`
           pipelineTailId = appendMediaImageNode(nodes, edges, {
             savedLayout, sb, sbId, fromId: pipelineTailId, mediaX, mediaY, imgId, url: firstUrl,
-            frameKind: 'first', frameLabel: '首帧',
+            frameKind: 'first', frameLabel: '首帧', imageRecord: firstRecord, imageError: firstError,
           })
           mediaX += MEDIA_GAP_X
         }
-        const lastUrl = imageRecordUrl(resolveSbLastImageRecord(sb, imagesBySbId))
-        if (lastUrl) {
+        const lastRecord = resolveSbLastImageRecord(sb, imagesBySbId, imageSupplements)
+        const lastUrl = imageRecordUrl(lastRecord)
+        const lastError = imageErrors[sb.id]?.last || (!lastUrl && sb.last_frame_image_id != null ? '绑定的尾帧图片不可用' : '')
+        if (lastUrl || lastError) {
           const imgId = `sbimg-last:${sb.id}`
           pipelineTailId = appendMediaImageNode(nodes, edges, {
             savedLayout, sb, sbId, fromId: pipelineTailId, mediaX, mediaY, imgId, url: lastUrl,
-            frameKind: 'last', frameLabel: '尾帧',
+            frameKind: 'last', frameLabel: '尾帧', imageRecord: lastRecord, imageError: lastError,
           })
           mediaX += MEDIA_GAP_X
         }
       } else {
-        const mainUrl = imageRecordUrl(resolveSbMainImageRecord(sb, imagesBySbId)) || storyboardImageUrl(sb)
-        if (mainUrl) {
+        const mainRecord = resolveSbMainImageRecord(sb, imagesBySbId, imageSupplements)
+        const mainUrl = imageRecordUrl(mainRecord)
+        const mainError = imageErrors[sb.id]?.main || (!mainUrl && sb.first_frame_image_id != null ? '绑定的分镜图片不可用' : '')
+        if (mainUrl || mainError) {
           const imgId = `sbimg:${sb.id}`
           pipelineTailId = appendMediaImageNode(nodes, edges, {
             savedLayout, sb, sbId, fromId: pipelineTailId, mediaX, mediaY, imgId, url: mainUrl,
-            frameKind: null, frameLabel: '分镜图',
+            frameKind: 'main', frameLabel: '分镜图', imageRecord: mainRecord, imageError: mainError,
           })
           mediaX += MEDIA_GAP_X
         }

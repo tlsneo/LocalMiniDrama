@@ -36,12 +36,13 @@
             <template v-if="refImageDataUrl">
               <img :src="refImageDataUrl" class="ref-preview" />
               <div class="ref-actions">
-                <el-button size="small" type="danger" plain @click.stop="clearRefImage">移除</el-button>
+                <el-button size="small" :disabled="refUploading || imageEditorBusy" @click.stop="editRefImage">AI 编辑</el-button>
+                <el-button size="small" type="danger" plain :disabled="imageEditorBusy" @click.stop="clearRefImage">移除</el-button>
               </div>
             </template>
             <template v-else>
               <el-icon class="upload-icon"><Picture /></el-icon>
-              <div class="upload-tip">点击或拖拽上传参考图</div>
+              <div class="upload-tip">{{ refUploading ? '正在上传…' : '点击或拖拽上传参考图' }}</div>
             </template>
           </div>
           <input ref="refImageInput" type="file" accept="image/*" style="display:none" @change="onRefImageChange" />
@@ -76,7 +77,7 @@
           type="primary"
           size="large"
           :loading="generating"
-          :disabled="!prompt.trim()"
+          :disabled="!prompt.trim() || refUploading || imageEditorBusy"
           class="generate-btn"
           @click="generate"
         >
@@ -88,7 +89,7 @@
       <div class="result-panel">
         <div class="result-header">
           <span class="result-title">生成结果</span>
-          <el-button v-if="results.length > 0" size="small" plain @click="clearResults">清空</el-button>
+          <el-button v-if="results.length > 0" size="small" plain :disabled="imageEditorBusy" @click="clearResults">清空</el-button>
         </div>
 
         <div v-if="results.length === 0 && !generating" class="empty-result">
@@ -102,7 +103,7 @@
         </div>
 
         <div class="result-grid">
-          <div v-for="(item, idx) in results" :key="idx" class="result-item">
+          <div v-for="item in results" :key="item.id" class="result-item">
             <div class="result-media">
               <video
                 v-if="item.type === 'video' && item.url"
@@ -115,7 +116,7 @@
                 v-else-if="item.type === 'image' && item.url"
                 :src="item.url"
                 class="result-image"
-                @click="previewUrl = item.url"
+                @click="previewItem = item"
               />
               <div v-else-if="item.status === 'pending' || item.status === 'processing'" class="media-loading">
                 <el-icon class="is-loading"><Loading /></el-icon>
@@ -129,6 +130,7 @@
             <div class="result-meta">
               <span class="result-prompt">{{ item.prompt }}</span>
               <div class="result-actions">
+                <el-button v-if="item.type === 'image' && item.url" size="small" :disabled="imageEditorBusy" @click="editResult(item)">AI 编辑</el-button>
                 <el-button v-if="item.url" size="small" plain @click="downloadItem(item)">下载</el-button>
               </div>
             </div>
@@ -138,20 +140,25 @@
     </div>
 
     <!-- 图片预览 -->
-    <div v-if="previewUrl" class="image-preview-overlay" @click="previewUrl = null">
-      <img :src="previewUrl" class="preview-img" @click.stop />
+    <div v-if="previewItem" class="image-preview-overlay" @click="previewItem = null">
+      <img :src="previewItem.url" class="preview-img" @click.stop />
+      <el-button :disabled="imageEditorBusy" @click.stop="editResult(previewItem)">AI 编辑</el-button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Picture, MagicStick, Loading, CircleClose } from '@element-plus/icons-vue'
 import { imagesAPI } from '@/api/images'
 import { videosAPI } from '@/api/videos'
 import { uploadAPI } from '@/api/upload'
 import { generationSettingsAPI } from '@/api/prompts'
+import { taskAPI } from '@/api/task'
+import { useImageEditor } from '@/composables/useImageEditor'
+import { imageRecordUrl } from '@/utils/storyboardMedia'
+import { completedImageTaskRecord } from '@/utils/freeCreateMedia'
 
 const mode = ref('image')
 const prompt = ref('')
@@ -160,7 +167,13 @@ const aspectRatio = ref('16:9')
 const duration = ref(5)
 const generating = ref(false)
 const results = ref([])
-const previewUrl = ref(null)
+const previewItem = ref(null)
+const { open: openImageEditor, busy: imageEditorBusy } = useImageEditor()
+const pageId = crypto.randomUUID()
+const refUploading = ref(false)
+let refVersion = 0
+let pageActive = true
+onBeforeUnmount(() => { pageActive = false; refVersion++ })
 const refImageDataUrl = ref(null)
 const refImageLocalPath = ref(null)
 const refImageInput = ref(null)
@@ -176,10 +189,13 @@ onMounted(async () => {
 })
 
 function triggerRefImageUpload() {
-  refImageInput.value?.click()
+  if (!imageEditorBusy.value) refImageInput.value?.click()
 }
 
 function clearRefImage() {
+  if (imageEditorBusy.value) return
+  refVersion++
+  refUploading.value = false
   refImageDataUrl.value = null
   refImageLocalPath.value = null
 }
@@ -197,19 +213,76 @@ function onRefImageDrop(e) {
 }
 
 async function processRefImageFile(file) {
-  const reader = new FileReader()
-  reader.onload = async (ev) => {
-    refImageDataUrl.value = ev.target.result
-    try {
-      const res = await uploadAPI.uploadImage(file)
-      refImageLocalPath.value = res?.local_path || null
-    } catch (_) {}
+  if (imageEditorBusy.value) return
+  if (!file.type.startsWith('image/')) return ElMessage.warning('请选择图片文件')
+  const version = ++refVersion
+  refUploading.value = true
+  // Publish preview and path together only after the original upload succeeds.
+  refImageDataUrl.value = null
+  refImageLocalPath.value = null
+  try {
+    const res = await uploadAPI.uploadImage(file)
+    if (!pageActive || version !== refVersion || imageEditorBusy.value) return
+    if (!res?.local_path) throw new Error('上传未返回图片路径')
+    refImageDataUrl.value = imageRecordUrl({ local_path: res.local_path })
+    refImageLocalPath.value = res.local_path
+  } catch (error) {
+    if (pageActive && version === refVersion) ElMessage.error(error.message || '参考图上传失败')
+  } finally {
+    if (version === refVersion) refUploading.value = false
   }
-  reader.readAsDataURL(file)
+}
+
+async function editRefImage() {
+  if (refUploading.value || !refImageLocalPath.value || imageEditorBusy.value) return
+  const version = refVersion
+  const path = refImageLocalPath.value
+  try {
+    await openImageEditor({
+      title: '编辑视频参考图（当前输入）',
+      source: { local_path: path, url: refImageDataUrl.value },
+      target: { type: 'page', id: `${pageId}:video-reference`, kind: 'reference' },
+      expected_ref: path,
+      validateTarget: () => pageActive && version === refVersion && path === refImageLocalPath.value,
+      onAdopted: (receipt) => {
+        if (!pageActive || version !== refVersion || path !== refImageLocalPath.value) throw new Error('参考图槽位已改变')
+        refVersion++
+        refImageDataUrl.value = imageRecordUrl({ ...receipt, image_url: receipt.image_url || receipt.url })
+        refImageLocalPath.value = receipt.local_path
+      },
+    })
+  } catch (error) { ElMessage.error(error.message || '无法打开图片编辑') }
+}
+
+async function editResult(item) {
+  if (imageEditorBusy.value || item?.type !== 'image' || !item.url) return
+  const oldUrl = item.url
+  const oldImageId = item.image_id
+  try {
+    // The overlay must not cover the shared editor, but its selected item stays fixed here.
+    previewItem.value = null
+    await openImageEditor({
+      title: '编辑自由创作结果',
+      source: { local_path: item.local_path, url: oldUrl, image_id: oldImageId },
+      target: { type: 'page', id: `${pageId}:${item.id}`, kind: 'free_result' },
+      expected_ref: item.local_path || oldUrl,
+      validateTarget: () => pageActive && results.value.some((r) => r.id === item.id)
+        && item.url === oldUrl && item.image_id === oldImageId,
+      onAdopted: (receipt) => {
+        if (!pageActive || !results.value.some((r) => r.id === item.id)
+          || item.url !== oldUrl || item.image_id !== oldImageId) throw new Error('结果项已改变')
+        item.local_path = receipt.local_path
+        item.url = imageRecordUrl({ ...receipt, image_url: receipt.image_url || receipt.url })
+        item.image_id = receipt.image_id
+      },
+    })
+  } catch (error) { ElMessage.error(error.message || '无法打开图片编辑') }
 }
 
 function clearResults() {
+  if (imageEditorBusy.value) return
   results.value = []
+  previewItem.value = null
 }
 
 function downloadItem(item) {
@@ -221,16 +294,19 @@ function downloadItem(item) {
 }
 
 async function generate() {
-  if (!prompt.value.trim()) return
+  if (!prompt.value.trim() || generating.value || refUploading.value || imageEditorBusy.value) return
   generating.value = true
-  const newItem = {
+  const newItem = reactive({
+    id: crypto.randomUUID(),
+    image_id: null,
+    local_path: null,
     type: mode.value,
     prompt: prompt.value,
     style: style.value,
     status: 'processing',
     url: null,
     error: null,
-  }
+  })
   results.value.unshift(newItem)
   try {
     if (mode.value === 'image') {
@@ -242,8 +318,9 @@ async function generate() {
       if (res?.task_id) {
         await pollImageTask(res.task_id, newItem)
       } else if (res?.image_url || res?.local_path) {
-        newItem.url = res.image_url || ('/static/' + res.local_path)
-        newItem.status = 'completed'
+        applyImageRecord(newItem, res)
+      } else {
+        throw new Error('提交未返回图片任务')
       }
     } else {
       const body = {
@@ -273,34 +350,39 @@ async function generate() {
   }
 }
 
+function applyImageRecord(item, record) {
+  item.image_id = record.id ?? null
+  item.local_path = record.local_path || null
+  item.url = imageRecordUrl(record)
+  item.status = 'completed'
+}
+
 async function pollImageTask(taskId, item, maxMs = 180000) {
   const start = Date.now()
-  while (Date.now() - start < maxMs) {
+  let lastError
+  while (pageActive && Date.now() - start < maxMs) {
     await new Promise((r) => setTimeout(r, 3000))
     try {
-      const res = await imagesAPI.getTask ? imagesAPI.getTask(taskId) : null
-      if (!res) break
-      if (res.status === 'completed' && res.result) {
-        const r = res.result
-        item.url = r.image_url ? r.image_url : (r.local_path ? '/static/' + r.local_path : null)
-        item.status = 'completed'
+      const res = await taskAPI.get(taskId)
+      if (res?.status === 'completed') {
+        const record = await completedImageTaskRecord(res, (id) => imagesAPI.get(id))
+        applyImageRecord(item, record)
         return
       }
-      if (res.status === 'failed') {
+      if (res?.status === 'failed') {
         item.status = 'failed'
         item.error = res.error || '生成失败'
         return
       }
-    } catch (_) {}
+    } catch (error) { lastError = error }
   }
   item.status = 'failed'
-  item.error = '超时'
+  item.error = lastError?.message || '超时'
 }
 
 async function pollVideoTask(taskId, item) {
   const maxMs = videoPollMaxMs.value
   const start = Date.now()
-  const { taskAPI } = await import('@/api/task')
   while (Date.now() - start < maxMs) {
     await new Promise((r) => setTimeout(r, 4000))
     try {

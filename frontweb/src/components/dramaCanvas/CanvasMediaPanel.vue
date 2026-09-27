@@ -33,10 +33,11 @@
       <template v-else-if="kind === 'image'">
         <div class="preview-wrap">
           <img v-if="url && !busy" :src="url" alt="" class="preview-img" />
-          <div v-else-if="!busy" class="preview-empty">无分镜图</div>
+          <div v-else-if="!busy" class="preview-empty">{{ imageError || '无分镜图' }}</div>
           <div v-if="busy" class="preview-loading"><span class="spinner" />生图中…</div>
         </div>
-        <el-button size="small" type="primary" :loading="busy" @click.stop="runStep('image')">重新生图</el-button>
+        <el-button v-if="url" size="small" :disabled="busy || ctx?.imageEditorBusy?.value" @click.stop="ctx?.editImage?.({ storyboard, imageRecord, frameKind })">AI 编辑</el-button>
+        <el-button size="small" type="primary" :loading="busy" :disabled="ctx?.imageEditorBusy?.value" @click.stop="runStep('image')">重新生图</el-button>
       </template>
 
       <template v-else-if="kind === 'video'">
@@ -71,6 +72,9 @@ const props = defineProps({
   storyboard: { type: Object, default: null },
   summary: { type: String, default: '' },
   url: { type: String, default: '' },
+  frameKind: { type: String, default: 'main' },
+  imageRecord: { type: Object, default: null },
+  imageError: { type: String, default: '' },
   audioType: { type: String, default: 'dialogue' },
 })
 

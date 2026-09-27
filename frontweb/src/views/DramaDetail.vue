@@ -146,7 +146,7 @@
           </div>
           <div v-loading="charLoading" class="library-list">
             <div v-for="item in charList" :key="item.id" class="library-item">
-              <div class="library-item-cover" @click="openPreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openPreview(item, 'character_library')">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-placeholder">暂无图</span>
               </div>
@@ -174,7 +174,7 @@
           </div>
           <div v-loading="sceneLoading" class="library-list">
             <div v-for="item in sceneList" :key="item.id" class="library-item">
-              <div class="library-item-cover" @click="openPreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openPreview(item, 'scene_library')">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-placeholder">暂无图</span>
               </div>
@@ -202,7 +202,7 @@
           </div>
           <div v-loading="propLoading" class="library-list">
             <div v-for="item in propList" :key="item.id" class="library-item">
-              <div class="library-item-cover" @click="openPreview(assetImageUrl(item))">
+              <div class="library-item-cover" @click="openPreview(item, 'prop_library')">
                 <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                 <span v-else class="library-placeholder">暂无图</span>
               </div>
@@ -226,7 +226,7 @@
           <div class="drama-res-list">
             <template v-if="drama?.characters?.length">
               <div v-for="item in drama.characters" :key="item.id" class="drama-res-item">
-                <div class="drama-res-cover" @click="openPreview(assetImageUrl(item))">
+                <div class="drama-res-cover" @click="openPreview(item, 'character')">
                   <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                   <span v-else class="library-placeholder">暂无图</span>
                 </div>
@@ -251,7 +251,7 @@
           <div class="drama-res-list">
             <template v-if="drama?.scenes?.length">
               <div v-for="item in drama.scenes" :key="item.id" class="drama-res-item">
-                <div class="drama-res-cover" @click="openPreview(assetImageUrl(item))">
+                <div class="drama-res-cover" @click="openPreview(item, 'scene')">
                   <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                   <span v-else class="library-placeholder">暂无图</span>
                 </div>
@@ -276,7 +276,7 @@
           <div class="drama-res-list">
             <template v-if="drama?.props?.length">
               <div v-for="item in drama.props" :key="item.id" class="drama-res-item">
-                <div class="drama-res-cover" @click="openPreview(assetImageUrl(item))">
+                <div class="drama-res-cover" @click="openPreview(item, 'prop')">
                   <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
                   <span v-else class="library-placeholder">暂无图</span>
                 </div>
@@ -303,7 +303,7 @@
       <el-form v-if="editDramaCharForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openPreview(assetImageUrl(editDramaCharForm))">
+            <div class="lib-img-thumb" @click="openPreview(editDramaCharForm, 'character')">
               <img v-if="editDramaCharForm.image_url || editDramaCharForm.local_path" :src="assetImageUrl(editDramaCharForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -337,7 +337,7 @@
       <el-form v-if="editDramaSceneForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openPreview(assetImageUrl(editDramaSceneForm))">
+            <div class="lib-img-thumb" @click="openPreview(editDramaSceneForm, 'scene')">
               <img v-if="editDramaSceneForm.image_url || editDramaSceneForm.local_path" :src="assetImageUrl(editDramaSceneForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -364,7 +364,7 @@
       <el-form v-if="editDramaPropForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openPreview(assetImageUrl(editDramaPropForm))">
+            <div class="lib-img-thumb" @click="openPreview(editDramaPropForm, 'prop')">
               <img v-if="editDramaPropForm.image_url || editDramaPropForm.local_path" :src="assetImageUrl(editDramaPropForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -391,7 +391,7 @@
       <el-form v-if="editCharForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openPreview(assetImageUrl(editCharForm))">
+            <div class="lib-img-thumb" @click="openPreview(editCharForm, 'character_library')">
               <img v-if="editCharForm.image_url || editCharForm.local_path" :src="assetImageUrl(editCharForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -418,7 +418,7 @@
       <el-form v-if="editSceneForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openPreview(assetImageUrl(editSceneForm))">
+            <div class="lib-img-thumb" @click="openPreview(editSceneForm, 'scene_library')">
               <img v-if="editSceneForm.image_url || editSceneForm.local_path" :src="assetImageUrl(editSceneForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -446,7 +446,7 @@
       <el-form v-if="editPropForm" label-width="80px">
         <el-form-item label="图片">
           <div class="lib-img-editor">
-            <div class="lib-img-thumb" @click="openPreview(assetImageUrl(editPropForm))">
+            <div class="lib-img-thumb" @click="openPreview(editPropForm, 'prop_library')">
               <img v-if="editPropForm.image_url || editPropForm.local_path" :src="assetImageUrl(editPropForm)" />
               <div v-else class="lib-img-empty"><el-icon><PictureFilled /></el-icon></div>
             </div>
@@ -482,7 +482,7 @@
       </div>
       <div v-loading="importLoading" class="library-list import-list">
         <div v-for="item in importList" :key="item.id" class="library-item">
-          <div class="library-item-cover" @click="openPreview(assetImageUrl(item))">
+          <div class="library-item-cover" @click="openPreview(item, (importType === 'char' ? 'character' : importType) + '_library')">
             <img v-if="item.image_url || item.local_path" :src="assetImageUrl(item)" alt="" />
             <span v-else class="library-placeholder">暂无图</span>
           </div>
@@ -518,6 +518,7 @@
     <Teleport to="body">
       <div v-if="previewUrl" class="image-preview-overlay" @click="previewUrl = null">
         <img :src="previewUrl" alt="" class="image-preview-img" @click.stop="previewUrl = null" />
+        <el-button v-if="previewImageContext" class="image-edit-entry" type="primary" :disabled="imageEditBusy" @click.stop="editPreviewImage">AI 编辑</el-button>
       </div>
     </Teleport>
   </div>
@@ -531,6 +532,7 @@ import { ArrowLeft, VideoPlay, Plus, Delete, Sunny, Moon, PictureFilled, Grid } 
 import EpisodeBatchImportDialog from '@/components/EpisodeBatchImportDialog.vue'
 import StylePickerButton from '@/components/StylePickerButton.vue'
 import { useTheme } from '@/composables/useTheme'
+import { useImageEditor } from '@/composables/useImageEditor'
 import { dramaAPI } from '@/api/drama'
 import { characterLibraryAPI } from '@/api/characterLibrary'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
@@ -1002,7 +1004,44 @@ async function onAddEpisode() {
 // ---------- 资源库 Tab ----------
 const activeResTab = ref('lib-char') // lib-char | lib-scene | lib-prop | drama-char | drama-scene | drama-prop
 const previewUrl = ref(null)
-function openPreview(url) { if (url) previewUrl.value = url }
+const { open: openImageEditor, busy: imageEditBusy } = useImageEditor()
+const previewImageContext = ref(null)
+function openPreview(item, type) {
+  if (!assetImageUrl(item)) return
+  previewUrl.value = assetImageUrl(item)
+  const id = Number(item.id)
+  const importScope = importType.value
+  previewImageContext.value = {
+    title: `AI 编辑${type.endsWith('_library') ? '库素材' : '共享资源'} · ${item.name || item.location || id}`,
+    source: { local_path: item.local_path || undefined, url: item.image_url || undefined },
+    target: { type, id, slot: 'main' },
+    expected_ref: item.local_path || item.image_url || '',
+    async onAdopted() {
+      const [api, rows, form] = {
+        character_library: [characterLibraryAPI, () => charList.value, editCharForm],
+        scene_library: [sceneLibraryAPI, () => sceneList.value, editSceneForm],
+        prop_library: [propLibraryAPI, () => propList.value, editPropForm],
+        character: [characterAPI, () => drama.value?.characters || [], editDramaCharForm],
+        scene: [sceneAPI, () => drama.value?.scenes || [], editDramaSceneForm],
+        prop: [propAPI, () => drama.value?.props || [], editDramaPropForm],
+      }[type]
+      const result = await api.get(id)
+      const fresh = result?.[type] || result
+      if (!fresh?.id) throw new Error('图片已保存，但资源刷新失败')
+      const patch = { image_url: fresh.image_url, local_path: fresh.local_path }
+      const importedRows = type.endsWith('_library') && importType.value === importScope
+        && type === (importScope === 'char' ? 'character' : importScope) + '_library' ? importList.value : []
+      for (const row of [item, ...rows(), ...importedRows, form.value]) {
+        if (row && Number(row.id) === id) Object.assign(row, patch)
+      }
+    },
+  }
+}
+async function editPreviewImage() {
+  const context = previewImageContext.value
+  previewUrl.value = null
+  try { await openImageEditor(context) } catch (e) { ElMessage.error(e.message || '无法打开图片编辑') }
+}
 
 // 角色
 const charList = ref([]), charLoading = ref(false), charPage = ref(1), charPageSize = ref(20), charTotal = ref(0), charKw = ref('')
@@ -1194,6 +1233,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.image-edit-entry { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); }
 .drama-detail {
   min-height: 100vh;
   background: #0f0f12;

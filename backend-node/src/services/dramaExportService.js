@@ -223,7 +223,8 @@ function exportDrama(db, cfg, log, dramaId) {
         storyboards: sbs.map(sb => {
           const igsForThis = allImagesBySb[sb.id] || [];
           // 兼容：仍提供 image_file（指向首帧或最新一张），旧版导入器可继续工作
-          let mainIg = igsForThis.find(g => g.id === sb.first_frame_image_id) || igsForThis[igsForThis.length - 1];
+          let mainIg = igsForThis.find(g => g.id === sb.first_frame_image_id)
+            || igsForThis.filter(g => g.frame_type !== 'image_edit_history').at(-1);
           const sbImageFile = mainIg ? `media/storyboards/sb_${sb.id}_gen_${mainIg.id}${extOf(mainIg.local_path)}` : null;
           const vg = videosBySb[sb.id];
           const sbVideoFile = vg && vg.local_path ? `media/videos/sb_${sb.id}${extOf(vg.local_path)}` : null;

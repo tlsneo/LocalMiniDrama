@@ -1,5 +1,5 @@
-import { assetImageUrl } from './mediaUrl'
-import { parseDramaMetadata } from './canvasLayout'
+import { assetImageUrl } from './mediaUrl.js'
+import { parseDramaMetadata } from './canvasLayout.js'
 
 export function dramaUsesFirstLastFrame(drama) {
   const meta = parseDramaMetadata(drama?.metadata)
@@ -30,57 +30,82 @@ export function getSbVideosList(videosBySbId, storyboardId) {
   return list.filter((v) => v.status === 'completed' && ((v.local_path && String(v.local_path).trim()) || isHttpVideoUrl(v.video_url)))
 }
 
-/** 首帧图记录（与 FilmCreate.getSbFirstImage 一致） */
-export function resolveSbFirstImageRecord(sb, imagesBySbId) {
-  if (!sb) return null
-  const images = getSbImagesList(imagesBySbId, sb.id)
-  if (sb.first_frame_image_id != null) {
-    const bound = images.find((i) => i.id === sb.first_frame_image_id)
-    if (bound) return bound
+export const IMAGE_FALLBACK_EXCLUDED_TYPES = 'image_edit_history,quad_grid,nine_grid'
+
+function imageSlot(sb, slot) {
+  const last = slot === 'last'
+  return {
+    id: last ? sb.last_frame_image_id : sb.first_frame_image_id,
+    image_url: last ? sb.last_frame_image_url : sb.image_url,
+    local_path: last ? sb.last_frame_local_path : sb.local_path,
+    frame_type: slot === 'main' ? undefined : `storyboard_${slot}`,
+    storyboard_id: sb.id,
+    source_slot: slot,
+    status: 'completed',
   }
-  const typed = images.find((i) => i.frame_type === 'storyboard_first')
-  if (typed) return typed
-  if (sb.local_path || sb.image_url) {
-    return {
-      id: sb.first_frame_image_id,
-      image_url: sb.image_url,
-      local_path: sb.local_path,
-      frame_type: 'storyboard_first',
-    }
-  }
-  return null
 }
 
-/** 尾帧图记录（与 FilmCreate.getSbLastImage 一致） */
-export function resolveSbLastImageRecord(sb, imagesBySbId) {
-  if (!sb) return null
-  const images = getSbImagesList(imagesBySbId, sb.id)
-  if (sb.last_frame_image_id != null) {
-    const bound = images.find((i) => i.id === sb.last_frame_image_id)
-    if (bound) return bound
+/** A supplementary GET must never resolve a different storyboard or image. */
+export function validateStoryboardImage(record, sb, id) {
+  if (!record || String(record.storyboard_id) !== String(sb.id)
+    || (id != null && String(record.id) !== String(id)) || !isCompletedImage(record)) {
+    throw new Error('绑定的分镜图片不可用')
   }
-  const typed = images.find((i) => i.frame_type === 'storyboard_last')
-  if (typed) return typed
-  if (sb.last_frame_image_url || sb.last_frame_local_path) {
-    return {
-      id: sb.last_frame_image_id,
-      image_url: sb.last_frame_image_url,
-      local_path: sb.last_frame_local_path,
-      frame_type: 'storyboard_last',
-    }
-  }
-  return null
+  return record
 }
 
-/** 经典单图模式主图 */
-export function resolveSbMainImageRecord(sb, imagesBySbId) {
+/** Pure canonical selection. Supplements are separate from paged history: [sb.id][slot]. */
+export function resolveSbImageRecord(sb, imagesBySbId, slot = 'main', supplements = {}) {
   if (!sb) return null
+  const fields = imageSlot(sb, slot)
   const images = getSbImagesList(imagesBySbId, sb.id)
-  if (images.length) return images[0]
-  if (sb.local_path || sb.image_url) {
-    return { image_url: sb.image_url, local_path: sb.local_path }
+  const extra = supplements?.[sb.id]?.[slot]
+  if (fields.id != null) {
+    const bound = images.find((i) => String(i.id) === String(fields.id))
+    if (bound) return { ...bound, source_slot: slot }
+    if (fields.local_path || fields.image_url) return fields
+    if (extra && String(extra.id) === String(fields.id)
+      && String(extra.storyboard_id) === String(sb.id) && isCompletedImage(extra)) {
+      return { ...extra, source_slot: slot }
+    }
+    return null // A missing/failed bound image must never select another image.
   }
-  return null
+  if (slot === 'main' && sb.composed_image) {
+    const value = sb.composed_image
+    return { storyboard_id: sb.id, source_slot: 'composed', status: 'completed',
+      ...(value.startsWith('/') || /^https?:/.test(value) ? { image_url: value } : { local_path: value }) }
+  }
+  if (fields.local_path || fields.image_url) return fields
+  const eligible = (i) => isCompletedImage(i) && i.frame_type !== 'image_edit_history'
+    && (slot === 'main' || i.frame_type === fields.frame_type)
+  const fallback = images.find(eligible)
+    || (extra && String(extra.storyboard_id) === String(sb.id) && eligible(extra) ? extra : null)
+  return fallback ? { ...fallback, source_slot: slot } : null
+}
+
+/** Network work needed after the normal page; callers own requests/errors/caches. */
+export function storyboardImageLookup(sb, imagesBySbId, slot = 'main') {
+  if (!sb || resolveSbImageRecord(sb, imagesBySbId, slot)) return null
+  const fields = imageSlot(sb, slot)
+  if (fields.id != null) return { id: fields.id }
+  return { params: {
+    storyboard_id: sb.id, status: 'completed', page_size: 1,
+    exclude_frame_types: IMAGE_FALLBACK_EXCLUDED_TYPES,
+    ...(fields.frame_type ? { frame_type: fields.frame_type } : {}),
+  } }
+}
+
+export function resolveSbFirstImageRecord(sb, imagesBySbId, supplements) {
+  return resolveSbImageRecord(sb, imagesBySbId, 'first', supplements)
+    || (sb?.first_frame_image_id == null && sb?.composed_image ? resolveSbImageRecord(sb, imagesBySbId, 'main', supplements) : null)
+}
+
+export function resolveSbLastImageRecord(sb, imagesBySbId, supplements) {
+  return resolveSbImageRecord(sb, imagesBySbId, 'last', supplements)
+}
+
+export function resolveSbMainImageRecord(sb, imagesBySbId, supplements) {
+  return resolveSbImageRecord(sb, imagesBySbId, 'main', supplements)
 }
 
 export function imageRecordUrl(record) {
@@ -121,16 +146,16 @@ export function videoRecordUrl(record) {
   return ''
 }
 
-export function sbVideoFirstLastUrls(sb, imagesBySbId, useFirstLast) {
+export function sbVideoFirstLastUrls(sb, imagesBySbId, useFirstLast, supplements) {
   const universal = sb?.creation_mode === 'universal'
   let first = ''
   let last = undefined
   if (!universal) {
-    const firstRec = useFirstLast ? resolveSbFirstImageRecord(sb, imagesBySbId) : resolveSbMainImageRecord(sb, imagesBySbId)
+    const firstRec = useFirstLast ? resolveSbFirstImageRecord(sb, imagesBySbId, supplements) : resolveSbMainImageRecord(sb, imagesBySbId, supplements)
     first = imageRecordUrl(firstRec)
   }
   if (useFirstLast && !universal) {
-    const lastRec = resolveSbLastImageRecord(sb, imagesBySbId)
+    const lastRec = resolveSbLastImageRecord(sb, imagesBySbId, supplements)
     const lu = imageRecordUrl(lastRec)
     if (lu) last = lu
   }
@@ -138,12 +163,9 @@ export function sbVideoFirstLastUrls(sb, imagesBySbId, useFirstLast) {
 }
 
 /** 分镜是否已有可用图片（与列表模式 hasSbImage 逻辑对齐） */
-export function hasStoryboardImage(sb, imagesBySbId, drama) {
-  if (!sb) return false
-  if (dramaUsesFirstLastFrame(drama) && sb.creation_mode !== 'universal') {
-    return !!(resolveSbFirstImageRecord(sb, imagesBySbId) || sb.image_url || sb.local_path || sb.composed_image)
-  }
-  return !!(resolveSbMainImageRecord(sb, imagesBySbId) || sb.image_url || sb.local_path || sb.composed_image)
+export function hasStoryboardImage(sb, imagesBySbId, drama, supplements) {
+  const slot = dramaUsesFirstLastFrame(drama) && sb?.creation_mode !== 'universal' ? 'first' : 'main'
+  return !!(slot === 'first' ? resolveSbFirstImageRecord(sb, imagesBySbId, supplements) : resolveSbImageRecord(sb, imagesBySbId, slot, supplements))
 }
 
 /** 分镜是否已有可用视频 */
