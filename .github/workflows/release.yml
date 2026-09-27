@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'   # 推送 vX.X.X 格式的 tag 时触发
+      - 'v*.*.*'   # 正式 tag 发布；vX.Y.Z-test.N 仅构建并上传 Artifact
   workflow_dispatch:  # 手动试打包 macOS ARM64，不创建 Release
 
 permissions:
@@ -158,7 +158,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [build-windows, build-macos-arm64]
-    if: ${{ always() && github.event_name == 'push' && needs.build-macos-arm64.result == 'success' }}
+    if: ${{ always() && github.event_name == 'push' && !contains(github.ref_name, '-test.') && needs.build-macos-arm64.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
